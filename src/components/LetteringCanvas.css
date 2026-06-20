@@ -127,6 +127,14 @@
   background-color: #4a3020;
 }
 
+.stepper-btn.next-pending-btn {
+  color: #8bc34a;
+}
+
+.stepper-btn.next-pending-btn:hover:not(:disabled) {
+  background-color: #2d4a2d;
+}
+
 .stepper-btn.export-btn {
   width: auto;
   padding: 0 8px;

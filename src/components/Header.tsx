@@ -13,10 +13,15 @@ import {
   FileText,
   Layers,
   AlertTriangle,
+  BarChart3,
 } from 'lucide-react'
 import './Header.css'
 
-export default function Header() {
+interface HeaderProps {
+  onOpenProgress: () => void
+}
+
+export default function Header({ onOpenProgress }: HeaderProps) {
   const {
     pages,
     currentPageIndex,
@@ -229,6 +234,10 @@ export default function Header() {
         <button className="action-btn" onClick={handleCheckMissing} title="检查漏嵌 (空格)" disabled={pages.length === 0}>
           <AlertTriangle size={16} />
           <span>检查</span>
+        </button>
+        <button className="action-btn" onClick={onOpenProgress} title="查看嵌字进度 (Shift+P)" disabled={pages.length === 0}>
+          <BarChart3 size={16} />
+          <span>进度</span>
         </button>
         <button className="action-btn" onClick={handleLoadProject} title="打开项目 (Ctrl+O)">
           <FolderOpen size={16} />

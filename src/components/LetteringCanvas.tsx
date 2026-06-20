@@ -3,7 +3,7 @@ import { useProjectStore } from '../store/useProjectStore'
 import { TextBox, TextBoxStyle } from '../types'
 import { renderPageToDataUrl } from '../utils/exportUtils'
 import { exportImage } from '../utils/fileUtils'
-import { ZoomIn, ZoomOut, Move, MousePointer2, ChevronLeft, ChevronRight, AlertCircle } from 'lucide-react'
+import { ZoomIn, ZoomOut, Move, MousePointer2, ChevronLeft, ChevronRight, AlertCircle, SkipForward } from 'lucide-react'
 import './LetteringCanvas.css'
 
 type ToolMode = 'select' | 'pan' | 'lettering'
@@ -74,29 +74,34 @@ function drawVerticalText(
   const fontStyle = `${italic ? 'italic ' : ''}${bold ? 'bold ' : ''}${fontSize}px ${fontFamily}`
   ctx.font = fontStyle
   ctx.textBaseline = 'top'
+  ctx.textAlign = 'left'
 
   const colWidth = fontSize * lineHeight
+  const safeFontSize = Math.max(1, fontSize)
+  const maxRows = Math.max(1, Math.floor(height / safeFontSize))
   const maxCols = Math.max(1, Math.floor(width / colWidth))
-  const maxRows = Math.max(1, Math.floor(height / fontSize))
 
   const chars = text.replace(/\n/g, '').split('')
-  const totalCols = Math.ceil(chars.length / maxRows)
-  const actualTotalWidth = totalCols * colWidth
-  const startOffsetX = (width - actualTotalWidth) / 2
+  const colsNeeded = Math.max(1, Math.ceil(chars.length / maxRows))
+  const actualCols = Math.min(colsNeeded, maxCols)
+  const totalWidth = actualCols * colWidth
+
+  const contentStartX = x + (width - totalWidth) / 2
+  const contentStartY = y
 
   let col = 0
   let row = 0
-  const centerX = x + width / 2
 
   for (const char of chars) {
     if (row >= maxRows) {
       row = 0
       col++
     }
-    if (col >= maxCols) break
+    if (col >= actualCols) break
 
-    const charX = centerX + startOffsetX + (maxCols - 1 - col) * colWidth + (colWidth - fontSize) / 2
-    const charY = y + row * fontSize
+    const colXFromRight = actualCols - 1 - col
+    const charX = contentStartX + colXFromRight * colWidth + (colWidth - safeFontSize) / 2
+    const charY = contentStartY + row * safeFontSize
 
     if (strokeWidth > 0) {
       ctx.strokeStyle = strokeColor
@@ -178,7 +183,8 @@ export default function LetteringCanvas() {
     defaultStyle,
     setDialogueStatus,
     selectLine,
-    selectNextUnembeddedLine,
+    selectNextPendingLine,
+    selectNextLine,
     selectPrevLine,
   } = useProjectStore()
 
@@ -434,7 +440,7 @@ export default function LetteringCanvas() {
         setDialogueStatus(selectedLine.id, 'embedded')
         selectTextBox(textBoxId)
       }
-      selectNextUnembeddedLine()
+      selectNextPendingLine()
       return
     }
 
@@ -452,7 +458,7 @@ export default function LetteringCanvas() {
       updateDialogueLine(selectedLine.id, { textBoxId })
       setDialogueStatus(selectedLine.id, 'embedded')
       selectTextBox(textBoxId)
-      selectNextUnembeddedLine()
+      selectNextPendingLine()
       return
     }
 
@@ -581,7 +587,7 @@ export default function LetteringCanvas() {
               className="stepper-btn"
               onClick={selectPrevLine}
               disabled={selectedLineIndex <= 0}
-              title="上一条"
+              title="上一条台词（按顺序）"
             >
               <ChevronLeft size={16} />
             </button>
@@ -595,10 +601,18 @@ export default function LetteringCanvas() {
             </span>
             <button
               className="stepper-btn"
-              onClick={() => selectNextUnembeddedLine()}
-              title="下一条"
+              onClick={() => selectNextLine()}
+              disabled={selectedLineIndex < 0 || selectedLineIndex >= currentPageLines.length - 1}
+              title="下一条台词（按顺序）"
             >
               <ChevronRight size={16} />
+            </button>
+            <button
+              className="stepper-btn next-pending-btn"
+              onClick={() => selectNextPendingLine()}
+              title="跳到下一条未嵌入/需重修"
+            >
+              <SkipForward size={14} />
             </button>
             {selectedLine && (
               <button

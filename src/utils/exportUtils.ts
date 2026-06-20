@@ -98,29 +98,34 @@ function drawVerticalText(
   const fontStyle = `${italic ? 'italic ' : ''}${bold ? 'bold ' : ''}${fontSize}px ${fontFamily}`
   ctx.font = fontStyle
   ctx.textBaseline = 'top'
+  ctx.textAlign = 'left'
 
   const colWidth = fontSize * lineHeight
+  const safeFontSize = Math.max(1, fontSize)
+  const maxRows = Math.max(1, Math.floor(height / safeFontSize))
   const maxCols = Math.max(1, Math.floor(width / colWidth))
-  const maxRows = Math.max(1, Math.floor(height / fontSize))
 
   const chars = text.replace(/\n/g, '').split('')
-  const totalCols = Math.ceil(chars.length / maxRows)
-  const actualTotalWidth = totalCols * colWidth
-  const startOffsetX = (width - actualTotalWidth) / 2
+  const colsNeeded = Math.max(1, Math.ceil(chars.length / maxRows))
+  const actualCols = Math.min(colsNeeded, maxCols)
+  const totalWidth = actualCols * colWidth
+
+  const contentStartX = x + (width - totalWidth) / 2
+  const contentStartY = y
 
   let col = 0
   let row = 0
-  const centerX = x + width / 2
 
   for (const char of chars) {
     if (row >= maxRows) {
       row = 0
       col++
     }
-    if (col >= maxCols) break
+    if (col >= actualCols) break
 
-    const charX = centerX + startOffsetX + (maxCols - 1 - col) * colWidth + (colWidth - fontSize) / 2
-    const charY = y + row * fontSize
+    const colXFromRight = actualCols - 1 - col
+    const charX = contentStartX + colXFromRight * colWidth + (colWidth - safeFontSize) / 2
+    const charY = contentStartY + row * safeFontSize
 
     if (strokeWidth > 0) {
       ctx.strokeStyle = strokeColor

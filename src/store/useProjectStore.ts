@@ -26,7 +26,8 @@ export const useProjectStore = create<ProjectState & {
   removeDialogueLine: (id: string) => void
   setDialogueStatus: (id: string, status: LineStatus) => void
   selectLine: (id: string | null) => void
-  selectNextUnembeddedLine: () => void
+  selectNextPendingLine: () => void
+  selectNextLine: () => void
   selectPrevLine: () => void
   moveLinesToPage: (fromPageIndex: number, toPageIndex: number) => void
   addTextBox: (textBox: Omit<TextBox, 'id'>) => string
@@ -40,6 +41,9 @@ export const useProjectStore = create<ProjectState & {
   loadProject: (state: ProjectState) => void
   getCurrentPageLines: () => DialogueLine[]
   getCurrentPageTextBoxes: () => TextBox[]
+  getPageStats: (pageIndex: number) => { total: number; unembedded: number; embedded: number; needs_rework: number }
+  getAllPageStats: () => Array<{ pageIndex: number; total: number; unembedded: number; embedded: number; needs_rework: number }>
+  findNeedsReworkLine: (fromPageIndex?: number, fromOrder?: number) => { pageIndex: number; lineId: string } | null
   reorderLines: (pageIndex: number, lineIds: string[]) => void
 }>((set, get) => ({
   pages: [],
@@ -159,9 +163,15 @@ export const useProjectStore = create<ProjectState & {
       dialogueLines: state.dialogueLines.map((l) => (l.id === id ? { ...l, status } : l)),
     })),
 
-  selectLine: (id) => set({ selectedLineId: id }),
+  selectLine: (id) => set((state) => {
+    const line = state.dialogueLines.find((l) => l.id === id)
+    return {
+      selectedLineId: id,
+      selectedTextBoxId: line?.textBoxId || null,
+    }
+  }),
 
-  selectNextUnembeddedLine: () =>
+  selectNextPendingLine: () =>
     set((state) => {
       const currentPageLines = state.dialogueLines
         .filter((l) => l.pageIndex === state.currentPageIndex)
@@ -191,6 +201,21 @@ export const useProjectStore = create<ProjectState & {
       }
 
       return {}
+    }),
+
+  selectNextLine: () =>
+    set((state) => {
+      const currentPageLines = state.dialogueLines
+        .filter((l) => l.pageIndex === state.currentPageIndex)
+        .sort((a, b) => a.order - b.order)
+
+      const currentIdx = currentPageLines.findIndex((l) => l.id === state.selectedLineId)
+      if (currentIdx < 0 || currentIdx >= currentPageLines.length - 1) return {}
+      const nextLine = currentPageLines[currentIdx + 1]
+      return {
+        selectedLineId: nextLine.id,
+        selectedTextBoxId: nextLine.textBoxId || null,
+      }
     }),
 
   selectPrevLine: () =>
@@ -308,6 +333,56 @@ export const useProjectStore = create<ProjectState & {
   getCurrentPageTextBoxes: () => {
     const state = get()
     return state.textBoxes.filter((t) => t.pageIndex === state.currentPageIndex)
+  },
+
+  getPageStats: (pageIndex) => {
+    const state = get()
+    const lines = state.dialogueLines.filter((l) => l.pageIndex === pageIndex)
+    return {
+      total: lines.length,
+      unembedded: lines.filter((l) => l.status === 'unembedded').length,
+      embedded: lines.filter((l) => l.status === 'embedded').length,
+      needs_rework: lines.filter((l) => l.status === 'needs_rework').length,
+    }
+  },
+
+  getAllPageStats: () => {
+    const state = get()
+    return state.pages.map((p) => {
+      const lines = state.dialogueLines.filter((l) => l.pageIndex === p.index)
+      return {
+        pageIndex: p.index,
+        total: lines.length,
+        unembedded: lines.filter((l) => l.status === 'unembedded').length,
+        embedded: lines.filter((l) => l.status === 'embedded').length,
+        needs_rework: lines.filter((l) => l.status === 'needs_rework').length,
+      }
+    })
+  },
+
+  findNeedsReworkLine: (fromPageIndex, fromOrder) => {
+    const state = get()
+    const startPage = fromPageIndex ?? 0
+    const startOrder = fromOrder ?? -1
+
+    for (let p = startPage; p < state.pages.length; p++) {
+      const pageLines = state.dialogueLines
+        .filter((l) => l.pageIndex === p && l.status === 'needs_rework')
+        .sort((a, b) => a.order - b.order)
+      const found = p === startPage
+        ? pageLines.find((l) => l.order > startOrder)
+        : pageLines[0]
+      if (found) return { pageIndex: p, lineId: found.id }
+    }
+
+    for (let p = 0; p <= startPage; p++) {
+      const pageLines = state.dialogueLines
+        .filter((l) => l.pageIndex === p && l.status === 'needs_rework')
+        .sort((a, b) => a.order - b.order)
+      if (pageLines.length > 0) return { pageIndex: p, lineId: pageLines[0].id }
+    }
+
+    return null
   },
 
   reorderLines: (pageIndex, lineIds) =>

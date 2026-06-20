@@ -4,7 +4,7 @@ import { useState, useRef, useEffect } from 'react'
 import './PageThumbnails.css'
 
 export default function PageThumbnails() {
-  const { pages, currentPageIndex, setCurrentPage } = useProjectStore()
+  const { pages, currentPageIndex, setCurrentPage, dialogueLines } = useProjectStore()
   const [isCollapsed, setIsCollapsed] = useState(false)
   const containerRef = useRef<HTMLDivElement>(null)
 
@@ -21,6 +21,16 @@ export default function PageThumbnails() {
     }
     generateThumbnails()
   }, [pages])
+
+  const getStats = (pageIndex: number) => {
+    const lines = dialogueLines.filter((l) => l.pageIndex === pageIndex)
+    return {
+      total: lines.length,
+      unembedded: lines.filter((l) => l.status === 'unembedded').length,
+      embedded: lines.filter((l) => l.status === 'embedded').length,
+      needs_rework: lines.filter((l) => l.status === 'needs_rework').length,
+    }
+  }
 
   const generateThumbnail = (imageDataUrl: string): Promise<string> => {
     return new Promise((resolve) => {
@@ -90,6 +100,7 @@ export default function PageThumbnails() {
         ) : (
           pages.map((page, index) => {
             const thumb = thumbnails.find((t) => t.index === index)
+            const stats = getStats(index)
             return (
               <div
                 key={index}
@@ -104,12 +115,26 @@ export default function PageThumbnails() {
                       <ImageIcon size={24} />
                     </div>
                   )}
+                  {stats.total > 0 && (
+                    <div className="thumbnail-line-count">
+                      {stats.total} 条
+                      {stats.needs_rework > 0 && <span className="rework-dot" />}
+                    </div>
+                  )}
                 </div>
                 <div className="thumbnail-info">
                   <span className="page-number">第 {index + 1} 页</span>
-                  <span className="page-name" title={page.fileName}>
-                    {page.fileName}
-                  </span>
+                  {stats.total > 0 ? (
+                    <div className="page-stats">
+                      {stats.unembedded > 0 && <span className="stat stat-unembedded">{stats.unembedded}未嵌</span>}
+                      {stats.embedded > 0 && <span className="stat stat-embedded">{stats.embedded}已嵌</span>}
+                      {stats.needs_rework > 0 && <span className="stat stat-rework">{stats.needs_rework}重修</span>}
+                    </div>
+                  ) : (
+                    <span className="page-name" title={page.fileName}>
+                      {page.fileName}
+                    </span>
+                  )}
                 </div>
               </div>
             )

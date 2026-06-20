@@ -141,6 +141,61 @@
   text-overflow: ellipsis;
 }
 
+.thumbnail-image {
+  position: relative;
+}
+
+.thumbnail-line-count {
+  position: absolute;
+  bottom: 4px;
+  left: 4px;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  background-color: rgba(0, 0, 0, 0.7);
+  color: #8bc34a;
+  font-size: 10px;
+  padding: 1px 5px;
+  border-radius: 3px;
+  font-weight: 500;
+}
+
+.rework-dot {
+  display: inline-block;
+  width: 6px;
+  height: 6px;
+  background-color: #ff9800;
+  border-radius: 50%;
+}
+
+.page-stats {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 3px;
+  font-size: 10px;
+}
+
+.page-stats .stat {
+  padding: 1px 4px;
+  border-radius: 2px;
+  font-size: 9px;
+}
+
+.page-stats .stat-unembedded {
+  background-color: #333;
+  color: #888;
+}
+
+.page-stats .stat-embedded {
+  background-color: #1b5e20;
+  color: #4caf50;
+}
+
+.page-stats .stat-rework {
+  background-color: #4a3000;
+  color: #ff9800;
+}
+
 .collapsed .thumbnails-header .title,
 .collapsed .thumbnails-list {
   display: none;

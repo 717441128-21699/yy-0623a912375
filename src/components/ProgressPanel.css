@@ -1,0 +1,254 @@
+.progress-panel-overlay {
+  position: fixed;
+  inset: 0;
+  background-color: rgba(0, 0, 0, 0.6);
+  z-index: 1000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.progress-panel {
+  width: 520px;
+  max-width: 90vw;
+  max-height: 80vh;
+  background-color: #252526;
+  border: 1px solid #3e3e42;
+  border-radius: 8px;
+  display: flex;
+  flex-direction: column;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
+}
+
+.progress-panel-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 16px;
+  border-bottom: 1px solid #3e3e42;
+  flex-shrink: 0;
+}
+
+.progress-panel .panel-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 14px;
+  font-weight: 600;
+  color: #cccccc;
+}
+
+.progress-panel .close-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  border-radius: 4px;
+  color: #aaaaaa;
+  transition: background-color 0.15s;
+}
+
+.progress-panel .close-btn:hover {
+  background-color: #3e3e42;
+  color: #ffffff;
+}
+
+.progress-summary {
+  display: flex;
+  gap: 12px;
+  padding: 12px 16px;
+  border-bottom: 1px solid #3e3e42;
+  flex-shrink: 0;
+  flex-wrap: wrap;
+}
+
+.progress-summary .summary-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: #cccccc;
+}
+
+.progress-summary .summary-label {
+  color: #888;
+}
+
+.progress-summary .summary-value {
+  font-weight: 600;
+  color: #ffffff;
+  min-width: 16px;
+  text-align: right;
+}
+
+.progress-summary .summary-item.unembedded {
+  color: #888;
+}
+
+.progress-summary .summary-item.embedded {
+  color: #4caf50;
+}
+
+.progress-summary .summary-item.needs_rework {
+  color: #ff9800;
+}
+
+.progress-list {
+  flex: 1;
+  overflow-y: auto;
+  padding: 12px;
+}
+
+.progress-empty {
+  text-align: center;
+  color: #666;
+  padding: 40px 20px;
+  font-size: 13px;
+}
+
+.progress-page-item {
+  background-color: #1e1e1e;
+  border: 1px solid #3e3e42;
+  border-radius: 6px;
+  margin-bottom: 10px;
+  overflow: hidden;
+  transition: border-color 0.15s;
+}
+
+.progress-page-item.active {
+  border-color: #0e639c;
+  box-shadow: 0 0 0 1px rgba(14, 99, 156, 0.4);
+}
+
+.progress-page-item .page-item-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  cursor: pointer;
+  transition: background-color 0.15s;
+}
+
+.progress-page-item .page-item-header:hover {
+  background-color: #2d2d30;
+}
+
+.progress-page-item .page-no {
+  font-size: 12px;
+  font-weight: 600;
+  color: #cccccc;
+  flex-shrink: 0;
+}
+
+.progress-page-item .page-name {
+  flex: 1;
+  font-size: 11px;
+  color: #888;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.progress-page-item .page-count {
+  font-size: 11px;
+  color: #8bc34a;
+  flex-shrink: 0;
+}
+
+.page-stats-bar {
+  display: flex;
+  height: 4px;
+  margin: 0 12px 6px;
+  border-radius: 2px;
+  overflow: hidden;
+  background-color: #333;
+}
+
+.bar-segment {
+  height: 100%;
+  transition: width 0.3s;
+}
+
+.bar-unembedded {
+  background-color: #555;
+}
+
+.bar-embedded {
+  background-color: #4caf50;
+}
+
+.bar-rework {
+  background-color: #ff9800;
+}
+
+.page-stat-numbers {
+  display: flex;
+  gap: 10px;
+  padding: 0 12px 10px;
+  font-size: 11px;
+}
+
+.page-stat-numbers .stat-num {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+}
+
+.page-stat-numbers .stat-unembedded {
+  color: #888;
+}
+
+.page-stat-numbers .stat-embedded {
+  color: #4caf50;
+}
+
+.page-stat-numbers .stat-rework {
+  color: #ff9800;
+}
+
+.rework-lines {
+  padding: 0 12px 10px;
+  border-top: 1px solid #333;
+  margin-top: 4px;
+  padding-top: 8px;
+}
+
+.rework-lines-label {
+  font-size: 10px;
+  color: #888;
+  margin-bottom: 6px;
+}
+
+.rework-lines-list {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.rework-line-btn {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 8px;
+  font-size: 11px;
+  color: #ff9800;
+  background-color: rgba(255, 152, 0, 0.08);
+  border: 1px solid rgba(255, 152, 0, 0.2);
+  border-radius: 3px;
+  text-align: left;
+  transition: background-color 0.15s;
+  cursor: pointer;
+}
+
+.rework-line-btn:hover {
+  background-color: rgba(255, 152, 0, 0.18);
+}
+
+.rework-line-btn .rework-line-text {
+  flex: 1;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font-size: 11px;
+}
