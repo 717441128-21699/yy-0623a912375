@@ -1,10 +1,12 @@
 import { useRef, useEffect, useState, useCallback } from 'react'
 import { useProjectStore } from '../store/useProjectStore'
 import { TextBox, TextBoxStyle } from '../types'
-import { ZoomIn, ZoomOut, Move, MousePointer2 } from 'lucide-react'
+import { renderPageToDataUrl } from '../utils/exportUtils'
+import { exportImage } from '../utils/fileUtils'
+import { ZoomIn, ZoomOut, Move, MousePointer2, ChevronLeft, ChevronRight, AlertCircle } from 'lucide-react'
 import './LetteringCanvas.css'
 
-type ToolMode = 'select' | 'pan' | 'create'
+type ToolMode = 'select' | 'pan' | 'lettering'
 
 interface DragState {
   isDragging: boolean
@@ -23,6 +25,138 @@ interface ResizeState {
   startHeight: number
   startTextBoxX: number
   startTextBoxY: number
+}
+
+function drawHorizontalText(
+  ctx: CanvasRenderingContext2D,
+  text: string,
+  x: number,
+  y: number,
+  width: number,
+  height: number,
+  style: TextBoxStyle
+) {
+  const { fontFamily, fontSize, lineHeight, strokeWidth, strokeColor, fillColor, bold, italic } = style
+  const fontStyle = `${italic ? 'italic ' : ''}${bold ? 'bold ' : ''}${fontSize}px ${fontFamily}`
+  ctx.font = fontStyle
+  ctx.textBaseline = 'top'
+
+  const lines = wrapText(ctx, text, Math.max(width, fontSize))
+  const totalHeight = lines.length * fontSize * lineHeight
+  const startY = y + (height - totalHeight) / 2
+
+  lines.forEach((line, i) => {
+    const lineY = startY + i * fontSize * lineHeight
+    const lineWidth = ctx.measureText(line).width
+    const lineX = x + (width - lineWidth) / 2
+
+    if (strokeWidth > 0) {
+      ctx.strokeStyle = strokeColor
+      ctx.lineWidth = strokeWidth * 2
+      ctx.lineJoin = 'round'
+      ctx.strokeText(line, lineX, lineY)
+    }
+    ctx.fillStyle = fillColor
+    ctx.fillText(line, lineX, lineY)
+  })
+}
+
+function drawVerticalText(
+  ctx: CanvasRenderingContext2D,
+  text: string,
+  x: number,
+  y: number,
+  width: number,
+  height: number,
+  style: TextBoxStyle
+) {
+  const { fontFamily, fontSize, lineHeight, strokeWidth, strokeColor, fillColor, bold, italic } = style
+  const fontStyle = `${italic ? 'italic ' : ''}${bold ? 'bold ' : ''}${fontSize}px ${fontFamily}`
+  ctx.font = fontStyle
+  ctx.textBaseline = 'top'
+
+  const colWidth = fontSize * lineHeight
+  const maxCols = Math.max(1, Math.floor(width / colWidth))
+  const maxRows = Math.max(1, Math.floor(height / fontSize))
+
+  const chars = text.replace(/\n/g, '').split('')
+  const totalCols = Math.ceil(chars.length / maxRows)
+  const actualTotalWidth = totalCols * colWidth
+  const startOffsetX = (width - actualTotalWidth) / 2
+
+  let col = 0
+  let row = 0
+  const centerX = x + width / 2
+
+  for (const char of chars) {
+    if (row >= maxRows) {
+      row = 0
+      col++
+    }
+    if (col >= maxCols) break
+
+    const charX = centerX + startOffsetX + (maxCols - 1 - col) * colWidth + (colWidth - fontSize) / 2
+    const charY = y + row * fontSize
+
+    if (strokeWidth > 0) {
+      ctx.strokeStyle = strokeColor
+      ctx.lineWidth = strokeWidth * 2
+      ctx.lineJoin = 'round'
+      ctx.strokeText(char, charX, charY)
+    }
+    ctx.fillStyle = fillColor
+    ctx.fillText(char, charX, charY)
+
+    row++
+  }
+}
+
+function drawText(
+  ctx: CanvasRenderingContext2D,
+  text: string,
+  x: number,
+  y: number,
+  width: number,
+  height: number,
+  style: TextBoxStyle
+) {
+  if (style.isVertical) {
+    drawVerticalText(ctx, text, x, y, width, height, style)
+  } else {
+    drawHorizontalText(ctx, text, x, y, width, height, style)
+  }
+}
+
+function wrapText(ctx: CanvasRenderingContext2D, text: string, maxWidth: number): string[] {
+  const lines: string[] = []
+  const paragraphs = text.split('\n')
+
+  paragraphs.forEach((paragraph) => {
+    if (paragraph === '') {
+      lines.push('')
+      return
+    }
+
+    let currentLine = ''
+    const chars = paragraph.split('')
+
+    chars.forEach((char) => {
+      const testLine = currentLine + char
+      const metrics = ctx.measureText(testLine)
+      if (metrics.width > maxWidth && currentLine !== '') {
+        lines.push(currentLine)
+        currentLine = char
+      } else {
+        currentLine = testLine
+      }
+    })
+
+    if (currentLine) {
+      lines.push(currentLine)
+    }
+  })
+
+  return lines
 }
 
 export default function LetteringCanvas() {
@@ -44,12 +178,14 @@ export default function LetteringCanvas() {
     defaultStyle,
     setDialogueStatus,
     selectLine,
+    selectNextUnembeddedLine,
+    selectPrevLine,
   } = useProjectStore()
 
   const [scale, setScale] = useState(1)
   const [offsetX, setOffsetX] = useState(0)
   const [offsetY, setOffsetY] = useState(0)
-  const [toolMode, setToolMode] = useState<ToolMode>('select')
+  const [toolMode, setToolMode] = useState<ToolMode>('lettering')
   const [isPanning, setIsPanning] = useState(false)
   const [panStart, setPanStart] = useState({ x: 0, y: 0 })
   const [dragState, setDragState] = useState<DragState | null>(null)
@@ -58,10 +194,14 @@ export default function LetteringCanvas() {
 
   const currentPage = pages[currentPageIndex]
   const currentPageTextBoxes = textBoxes.filter((t) => t.pageIndex === currentPageIndex)
+  const currentPageLines = dialogueLines
+    .filter((l) => l.pageIndex === currentPageIndex)
+    .sort((a, b) => a.order - b.order)
+  const selectedLine = dialogueLines.find((l) => l.id === selectedLineId)
+  const selectedLineIndex = currentPageLines.findIndex((l) => l.id === selectedLineId)
 
   useEffect(() => {
     if (!currentPage) return
-
     const img = new Image()
     img.onload = () => {
       imageRef.current = img
@@ -79,7 +219,6 @@ export default function LetteringCanvas() {
         canvasRef.current.height = rect.height
       }
     }
-
     handleResize()
     window.addEventListener('resize', handleResize)
     return () => window.removeEventListener('resize', handleResize)
@@ -91,159 +230,44 @@ export default function LetteringCanvas() {
     const scaleX = containerRect.width / imgWidth
     const scaleY = containerRect.height / imgHeight
     const newScale = Math.min(scaleX, scaleY, 1) * 0.9
-
     setScale(newScale)
     setOffsetX((containerRect.width - imgWidth * newScale) / 2)
     setOffsetY((containerRect.height - imgHeight * newScale) / 2)
   }, [])
 
   const screenToImageCoords = useCallback((screenX: number, screenY: number) => {
-    return {
-      x: (screenX - offsetX) / scale,
-      y: (screenY - offsetY) / scale,
-    }
+    return { x: (screenX - offsetX) / scale, y: (screenY - offsetY) / scale }
   }, [offsetX, offsetY, scale])
 
   const imageToScreenCoords = useCallback((imgX: number, imgY: number) => {
-    return {
-      x: imgX * scale + offsetX,
-      y: imgY * scale + offsetY,
-    }
+    return { x: imgX * scale + offsetX, y: imgY * scale + offsetY }
   }, [offsetX, offsetY, scale])
 
-  const drawText = useCallback((
-    ctx: CanvasRenderingContext2D,
-    text: string,
-    x: number,
-    y: number,
-    width: number,
-    height: number,
-    style: TextBoxStyle
-  ) => {
+  const estimateTextBoxSize = useCallback((text: string, style: TextBoxStyle): { w: number; h: number } => {
+    const canvas = document.createElement('canvas')
+    const ctx = canvas.getContext('2d')
+    if (!ctx) return { w: 150, h: 60 }
+    const fontStyle = `${style.italic ? 'italic ' : ''}${style.bold ? 'bold ' : ''}${style.fontSize}px ${style.fontFamily}`
+    ctx.font = fontStyle
+
     if (style.isVertical) {
-      drawVerticalText(ctx, text, x, y, width, height, style)
+      const maxRows = Math.max(1, Math.floor(200 / style.fontSize))
+      const totalCols = Math.ceil(text.replace(/\n/g, '').length / maxRows)
+      const w = Math.max(totalCols * style.fontSize * style.lineHeight, style.fontSize * style.lineHeight)
+      const h = Math.max(maxRows * style.fontSize, style.fontSize * 2)
+      return { w, h }
     } else {
-      drawHorizontalText(ctx, text, x, y, width, height, style)
+      const lines = wrapText(ctx, text, 200)
+      const maxLineWidth = Math.max(...lines.map((l) => ctx.measureText(l).width), 40)
+      const w = Math.max(maxLineWidth + style.fontSize, 60)
+      const h = Math.max(lines.length * style.fontSize * style.lineHeight, style.fontSize * 2)
+      return { w, h }
     }
   }, [])
-
-  const drawHorizontalText = (
-    ctx: CanvasRenderingContext2D,
-    text: string,
-    x: number,
-    y: number,
-    width: number,
-    height: number,
-    style: TextBoxStyle
-  ) => {
-    const { fontFamily, fontSize, lineHeight, strokeWidth, strokeColor, fillColor, bold, italic } = style
-    const fontStyle = `${italic ? 'italic ' : ''}${bold ? 'bold ' : ''}${fontSize}px ${fontFamily}`
-    ctx.font = fontStyle
-
-    const lines = wrapText(ctx, text, width)
-    const totalHeight = lines.length * fontSize * lineHeight
-    const startY = y + (height - totalHeight) / 2
-
-    lines.forEach((line, i) => {
-      const lineY = startY + i * fontSize * lineHeight
-      const lineWidth = ctx.measureText(line).width
-      const lineX = x + (width - lineWidth) / 2
-
-      if (strokeWidth > 0) {
-        ctx.strokeStyle = strokeColor
-        ctx.lineWidth = strokeWidth * 2
-        ctx.lineJoin = 'round'
-        ctx.strokeText(line, lineX, lineY)
-      }
-
-      ctx.fillStyle = fillColor
-      ctx.fillText(line, lineX, lineY)
-    })
-  }
-
-  const drawVerticalText = (
-    ctx: CanvasRenderingContext2D,
-    text: string,
-    x: number,
-    y: number,
-    width: number,
-    height: number,
-    style: TextBoxStyle
-  ) => {
-    const { fontFamily, fontSize, lineHeight, strokeWidth, strokeColor, fillColor, bold, italic } = style
-    const fontStyle = `${italic ? 'italic ' : ''}${bold ? 'bold ' : ''}${fontSize}px ${fontFamily}`
-    ctx.font = fontStyle
-
-    const chars = text.split('')
-    const charHeight = fontSize
-    const lineHeight_ = fontSize * lineHeight
-
-    const totalWidth = Math.ceil(chars.length / Math.floor(height / charHeight)) * lineHeight_
-    const startX = x + (width - totalWidth) / 2 + lineHeight_ / 2
-
-    let col = 0
-    let row = 0
-    const maxRows = Math.floor(height / charHeight)
-
-    chars.forEach((char) => {
-      if (row >= maxRows) {
-        row = 0
-        col++
-      }
-
-      const charX = startX - col * lineHeight_ - fontSize / 2
-      const charY = y + row * charHeight + (height - maxRows * charHeight) / 2
-
-      if (strokeWidth > 0) {
-        ctx.strokeStyle = strokeColor
-        ctx.lineWidth = strokeWidth * 2
-        ctx.lineJoin = 'round'
-        ctx.strokeText(char, charX, charY)
-      }
-
-      ctx.fillStyle = fillColor
-      ctx.fillText(char, charX, charY)
-
-      row++
-    })
-  }
-
-  const wrapText = (ctx: CanvasRenderingContext2D, text: string, maxWidth: number): string[] => {
-    const lines: string[] = []
-    const paragraphs = text.split('\n')
-
-    paragraphs.forEach((paragraph) => {
-      if (paragraph === '') {
-        lines.push('')
-        return
-      }
-
-      let currentLine = ''
-      const chars = paragraph.split('')
-
-      chars.forEach((char) => {
-        const testLine = currentLine + char
-        const metrics = ctx.measureText(testLine)
-        if (metrics.width > maxWidth && currentLine !== '') {
-          lines.push(currentLine)
-          currentLine = char
-        } else {
-          currentLine = testLine
-        }
-      })
-
-      if (currentLine) {
-        lines.push(currentLine)
-      }
-    })
-
-    return lines
-  }
 
   useEffect(() => {
     const canvas = canvasRef.current
     if (!canvas) return
-
     const ctx = canvas.getContext('2d')
     if (!ctx) return
 
@@ -252,50 +276,17 @@ export default function LetteringCanvas() {
     ctx.fillRect(0, 0, canvas.width, canvas.height)
 
     if (!imageRef.current || !currentPage) return
-
     const img = imageRef.current
-    const imgScreenW = img.width * scale
-    const imgScreenH = img.height * scale
-
-    ctx.drawImage(img, offsetX, offsetY, imgScreenW, imgScreenH)
+    ctx.drawImage(img, offsetX, offsetY, img.width * scale, img.height * scale)
 
     currentPageTextBoxes.forEach((textBox) => {
-      const screenPos = imageToScreenCoords(textBox.x, textBox.y)
-      const screenW = textBox.width * scale
-      const screenH = textBox.height * scale
-
-      if (textBox.id === selectedTextBoxId) {
-        ctx.strokeStyle = '#0e639c'
-        ctx.lineWidth = 2
-        ctx.setLineDash([5, 5])
-        ctx.strokeRect(screenPos.x, screenPos.y, screenW, screenH)
-        ctx.setLineDash([])
-
-        const handleSize = 8
-        ctx.fillStyle = '#ffffff'
-        ctx.strokeStyle = '#0e639c'
-        ctx.lineWidth = 1
-
-        const handles = [
-          { x: screenPos.x, y: screenPos.y, cursor: 'nw' },
-          { x: screenPos.x + screenW / 2, y: screenPos.y, cursor: 'n' },
-          { x: screenPos.x + screenW, y: screenPos.y, cursor: 'ne' },
-          { x: screenPos.x + screenW, y: screenPos.y + screenH / 2, cursor: 'e' },
-          { x: screenPos.x + screenW, y: screenPos.y + screenH, cursor: 'se' },
-          { x: screenPos.x + screenW / 2, y: screenPos.y + screenH, cursor: 's' },
-          { x: screenPos.x, y: screenPos.y + screenH, cursor: 'sw' },
-          { x: screenPos.x, y: screenPos.y + screenH / 2, cursor: 'w' },
-        ]
-
-        handles.forEach((handle) => {
-          ctx.fillRect(handle.x - handleSize / 2, handle.y - handleSize / 2, handleSize, handleSize)
-          ctx.strokeRect(handle.x - handleSize / 2, handle.y - handleSize / 2, handleSize, handleSize)
-        })
-      }
+      const sp = imageToScreenCoords(textBox.x, textBox.y)
+      const sw = textBox.width * scale
+      const sh = textBox.height * scale
 
       ctx.save()
       ctx.beginPath()
-      ctx.rect(screenPos.x, screenPos.y, screenW, screenH)
+      ctx.rect(sp.x, sp.y, sw, sh)
       ctx.clip()
 
       const scaledStyle: TextBoxStyle = {
@@ -303,25 +294,72 @@ export default function LetteringCanvas() {
         fontSize: textBox.style.fontSize * scale,
         strokeWidth: textBox.style.strokeWidth * scale,
       }
-
-      drawText(ctx, textBox.text, screenPos.x, screenPos.y, screenW, screenH, scaledStyle)
+      drawText(ctx, textBox.text, sp.x, sp.y, sw, sh, scaledStyle)
       ctx.restore()
+
+      const linkedLine = dialogueLines.find((l) => l.textBoxId === textBox.id)
+      const isSelected = textBox.id === selectedTextBoxId || linkedLine?.id === selectedLineId
+
+      if (isSelected) {
+        ctx.strokeStyle = '#0e639c'
+        ctx.lineWidth = 2
+        ctx.setLineDash([5, 5])
+        ctx.strokeRect(sp.x, sp.y, sw, sh)
+        ctx.setLineDash([])
+
+        const hs = 8
+        const handles = [
+          { hx: sp.x, hy: sp.y },
+          { hx: sp.x + sw / 2, hy: sp.y },
+          { hx: sp.x + sw, hy: sp.y },
+          { hx: sp.x + sw, hy: sp.y + sh / 2 },
+          { hx: sp.x + sw, hy: sp.y + sh },
+          { hx: sp.x + sw / 2, hy: sp.y + sh },
+          { hx: sp.x, hy: sp.y + sh },
+          { hx: sp.x, hy: sp.y + sh / 2 },
+        ]
+        ctx.fillStyle = '#ffffff'
+        ctx.strokeStyle = '#0e639c'
+        ctx.lineWidth = 1
+        handles.forEach(({ hx, hy }) => {
+          ctx.fillRect(hx - hs / 2, hy - hs / 2, hs, hs)
+          ctx.strokeRect(hx - hs / 2, hy - hs / 2, hs, hs)
+        })
+      } else if (linkedLine && linkedLine.status === 'needs_rework') {
+        ctx.strokeStyle = '#ff9800'
+        ctx.lineWidth = 2
+        ctx.setLineDash([3, 3])
+        ctx.strokeRect(sp.x, sp.y, sw, sh)
+        ctx.setLineDash([])
+      }
     })
-  }, [
-    currentPage,
-    currentPageTextBoxes,
-    selectedTextBoxId,
-    scale,
-    offsetX,
-    offsetY,
-    canvasSize,
-    drawText,
-    imageToScreenCoords,
-  ])
+  }, [currentPage, currentPageTextBoxes, selectedTextBoxId, selectedLineId, scale, offsetX, offsetY, canvasSize, imageToScreenCoords, dialogueLines])
+
+  const getResizeHandle = (mouseX: number, mouseY: number, textBox: TextBox): string | null => {
+    const sp = imageToScreenCoords(textBox.x, textBox.y)
+    const sw = textBox.width * scale
+    const sh = textBox.height * scale
+    const hs = 12
+    const handles = [
+      { name: 'nw', hx: sp.x, hy: sp.y },
+      { name: 'n', hx: sp.x + sw / 2, hy: sp.y },
+      { name: 'ne', hx: sp.x + sw, hy: sp.y },
+      { name: 'e', hx: sp.x + sw, hy: sp.y + sh / 2 },
+      { name: 'se', hx: sp.x + sw, hy: sp.y + sh },
+      { name: 's', hx: sp.x + sw / 2, hy: sp.y + sh },
+      { name: 'sw', hx: sp.x, hy: sp.y + sh },
+      { name: 'w', hx: sp.x, hy: sp.y + sh / 2 },
+    ]
+    for (const h of handles) {
+      if (Math.abs(mouseX - h.hx) <= hs / 2 && Math.abs(mouseY - h.hy) <= hs / 2) {
+        return h.name
+      }
+    }
+    return null
+  }
 
   const handleCanvasMouseDown = (e: React.MouseEvent) => {
     if (!canvasRef.current) return
-
     const rect = canvasRef.current.getBoundingClientRect()
     const mouseX = e.clientX - rect.left
     const mouseY = e.clientY - rect.top
@@ -329,30 +367,6 @@ export default function LetteringCanvas() {
     if (toolMode === 'pan') {
       setIsPanning(true)
       setPanStart({ x: mouseX - offsetX, y: mouseY - offsetY })
-      return
-    }
-
-    if (toolMode === 'create') {
-      const imgCoords = screenToImageCoords(mouseX, mouseY)
-      const selectedLine = dialogueLines.find((l) => l.id === selectedLineId)
-      
-      const textBoxId = addTextBox({
-        pageIndex: currentPageIndex,
-        x: imgCoords.x - 75,
-        y: imgCoords.y - 30,
-        width: 150,
-        height: 60,
-        text: selectedLine?.text || '新台词',
-        style: { ...defaultStyle },
-      })
-
-      if (selectedLine && !selectedLine.textBoxId) {
-        updateDialogueLine(selectedLine.id, { textBoxId })
-        setDialogueStatus(selectedLine.id, 'embedded')
-      }
-
-      selectTextBox(textBoxId)
-      setToolMode('select')
       return
     }
 
@@ -368,11 +382,8 @@ export default function LetteringCanvas() {
 
     if (clickedTextBox) {
       selectTextBox(clickedTextBox.id)
-      
       const line = dialogueLines.find((l) => l.textBoxId === clickedTextBox.id)
-      if (line) {
-        selectLine(line.id)
-      }
+      if (line) selectLine(line.id)
 
       const handle = getResizeHandle(mouseX, mouseY, clickedTextBox)
       if (handle) {
@@ -395,42 +406,61 @@ export default function LetteringCanvas() {
           textBoxStartY: clickedTextBox.y,
         })
       }
-    } else {
-      selectTextBox(null)
+      return
     }
-  }
 
-  const getResizeHandle = (mouseX: number, mouseY: number, textBox: TextBox): string | null => {
-    const screenPos = imageToScreenCoords(textBox.x, textBox.y)
-    const screenW = textBox.width * scale
-    const screenH = textBox.height * scale
-    const handleSize = 12
-
-    const handles = [
-      { name: 'nw', x: screenPos.x, y: screenPos.y },
-      { name: 'n', x: screenPos.x + screenW / 2, y: screenPos.y },
-      { name: 'ne', x: screenPos.x + screenW, y: screenPos.y },
-      { name: 'e', x: screenPos.x + screenW, y: screenPos.y + screenH / 2 },
-      { name: 'se', x: screenPos.x + screenW, y: screenPos.y + screenH },
-      { name: 's', x: screenPos.x + screenW / 2, y: screenPos.y + screenH },
-      { name: 'sw', x: screenPos.x, y: screenPos.y + screenH },
-      { name: 'w', x: screenPos.x, y: screenPos.y + screenH / 2 },
-    ]
-
-    for (const handle of handles) {
-      if (
-        Math.abs(mouseX - handle.x) <= handleSize / 2 &&
-        Math.abs(mouseY - handle.y) <= handleSize / 2
-      ) {
-        return handle.name
+    if (toolMode === 'lettering' && selectedLine) {
+      const { w, h } = estimateTextBoxSize(selectedLine.text, defaultStyle)
+      if (selectedLine.textBoxId) {
+        const existingBox = textBoxes.find((t) => t.id === selectedLine.textBoxId)
+        if (existingBox) {
+          updateTextBox(existingBox.id, {
+            x: imgCoords.x - existingBox.width / 2,
+            y: imgCoords.y - existingBox.height / 2,
+          })
+          selectTextBox(existingBox.id)
+        }
+      } else {
+        const textBoxId = addTextBox({
+          pageIndex: currentPageIndex,
+          x: imgCoords.x - w / 2,
+          y: imgCoords.y - h / 2,
+          width: w,
+          height: h,
+          text: selectedLine.text,
+          style: { ...defaultStyle },
+        })
+        updateDialogueLine(selectedLine.id, { textBoxId })
+        setDialogueStatus(selectedLine.id, 'embedded')
+        selectTextBox(textBoxId)
       }
+      selectNextUnembeddedLine()
+      return
     }
-    return null
+
+    if (toolMode === 'select' && selectedLine && !selectedLine.textBoxId) {
+      const { w, h } = estimateTextBoxSize(selectedLine.text, defaultStyle)
+      const textBoxId = addTextBox({
+        pageIndex: currentPageIndex,
+        x: imgCoords.x - w / 2,
+        y: imgCoords.y - h / 2,
+        width: w,
+        height: h,
+        text: selectedLine.text,
+        style: { ...defaultStyle },
+      })
+      updateDialogueLine(selectedLine.id, { textBoxId })
+      setDialogueStatus(selectedLine.id, 'embedded')
+      selectTextBox(textBoxId)
+      selectNextUnembeddedLine()
+      return
+    }
+
+    selectTextBox(null)
   }
 
   const handleCanvasMouseMove = (e: React.MouseEvent) => {
     if (!canvasRef.current) return
-
     const rect = canvasRef.current.getBoundingClientRect()
     const mouseX = e.clientX - rect.left
     const mouseY = e.clientY - rect.top
@@ -454,33 +484,23 @@ export default function LetteringCanvas() {
       const dx = (mouseX - resizeState.startX) / scale
       const dy = (mouseY - resizeState.startY) / scale
       const handle = resizeState.handle
-
       let newX = resizeState.startTextBoxX
       let newY = resizeState.startTextBoxY
       let newWidth = resizeState.startWidth
       let newHeight = resizeState.startHeight
 
-      if (handle.includes('e')) {
-        newWidth = Math.max(20, resizeState.startWidth + dx)
-      }
+      if (handle.includes('e')) newWidth = Math.max(20, resizeState.startWidth + dx)
       if (handle.includes('w')) {
         newWidth = Math.max(20, resizeState.startWidth - dx)
         newX = resizeState.startTextBoxX + (resizeState.startWidth - newWidth)
       }
-      if (handle.includes('s')) {
-        newHeight = Math.max(20, resizeState.startHeight + dy)
-      }
+      if (handle.includes('s')) newHeight = Math.max(20, resizeState.startHeight + dy)
       if (handle.includes('n')) {
         newHeight = Math.max(20, resizeState.startHeight - dy)
         newY = resizeState.startTextBoxY + (resizeState.startHeight - newHeight)
       }
 
-      updateTextBox(selectedTextBoxId, {
-        x: newX,
-        y: newY,
-        width: newWidth,
-        height: newHeight,
-      })
+      updateTextBox(selectedTextBoxId, { x: newX, y: newY, width: newWidth, height: newHeight })
     }
   }
 
@@ -492,36 +512,24 @@ export default function LetteringCanvas() {
 
   const handleCanvasWheel = (e: React.WheelEvent) => {
     e.preventDefault()
-    
     if (!canvasRef.current) return
-    
     const rect = canvasRef.current.getBoundingClientRect()
     const mouseX = e.clientX - rect.left
     const mouseY = e.clientY - rect.top
-
     const delta = e.deltaY > 0 ? 0.9 : 1.1
     const newScale = Math.min(Math.max(scale * delta, 0.1), 5)
-
     const imgX = (mouseX - offsetX) / scale
     const imgY = (mouseY - offsetY) / scale
-
     setScale(newScale)
     setOffsetX(mouseX - imgX * newScale)
     setOffsetY(mouseY - imgY * newScale)
   }
 
-  const handleZoomIn = () => {
-    setScale((prev) => Math.min(prev * 1.2, 5))
-  }
-
-  const handleZoomOut = () => {
-    setScale((prev) => Math.max(prev / 1.2, 0.1))
-  }
-
-  const handleFitScreen = () => {
-    if (imageRef.current) {
-      fitToScreen(imageRef.current.width, imageRef.current.height)
-    }
+  const handleExportCurrent = async () => {
+    if (!currentPage) return
+    const dataUrl = await renderPageToDataUrl(currentPage, textBoxes)
+    const fileName = `page_${String(currentPageIndex + 1).padStart(3, '0')}.png`
+    await exportImage(dataUrl, fileName)
   }
 
   if (!currentPage) {
@@ -534,14 +542,27 @@ export default function LetteringCanvas() {
     )
   }
 
+  const cursorStyle = toolMode === 'pan' || isPanning
+    ? (isPanning ? 'grabbing' : 'grab')
+    : toolMode === 'lettering' && selectedLine
+      ? 'crosshair'
+      : 'default'
+
   return (
     <div className="lettering-canvas-container">
       <div className="canvas-toolbar">
         <div className="tool-group">
           <button
+            className={`tool-btn ${toolMode === 'lettering' ? 'active' : ''}`}
+            onClick={() => setToolMode('lettering')}
+            title="嵌字模式：点击画布放置文字框"
+          >
+            嵌字
+          </button>
+          <button
             className={`tool-btn ${toolMode === 'select' ? 'active' : ''}`}
             onClick={() => setToolMode('select')}
-            title="选择工具"
+            title="选择/移动工具"
           >
             <MousePointer2 size={16} />
           </button>
@@ -552,24 +573,64 @@ export default function LetteringCanvas() {
           >
             <Move size={16} />
           </button>
-          <button
-            className={`tool-btn ${toolMode === 'create' ? 'active' : ''}`}
-            onClick={() => setToolMode('create')}
-            title="创建文字框"
-          >
-            +T
-          </button>
         </div>
 
+        {toolMode === 'lettering' && currentPageLines.length > 0 && (
+          <div className="lettering-stepper">
+            <button
+              className="stepper-btn"
+              onClick={selectPrevLine}
+              disabled={selectedLineIndex <= 0}
+              title="上一条"
+            >
+              <ChevronLeft size={16} />
+            </button>
+            <span className="stepper-info">
+              {selectedLineIndex >= 0 ? `${selectedLineIndex + 1}` : '-'}/{currentPageLines.length}
+              {selectedLine && (
+                <span className={`stepper-status status-${selectedLine.status}`}>
+                  {selectedLine.status === 'unembedded' ? '未嵌入' : selectedLine.status === 'embedded' ? '已嵌入' : '需重修'}
+                </span>
+              )}
+            </span>
+            <button
+              className="stepper-btn"
+              onClick={() => selectNextUnembeddedLine()}
+              title="下一条"
+            >
+              <ChevronRight size={16} />
+            </button>
+            {selectedLine && (
+              <button
+                className="stepper-btn rework-btn"
+                onClick={() => {
+                  const newStatus = selectedLine.status === 'needs_rework' ? 'unembedded' : 'needs_rework'
+                  setDialogueStatus(selectedLine.id, newStatus)
+                }}
+                title="标记需重修"
+              >
+                <AlertCircle size={14} />
+              </button>
+            )}
+            <button
+              className="stepper-btn export-btn"
+              onClick={handleExportCurrent}
+              title="导出当前页（原图尺寸）"
+            >
+              导出
+            </button>
+          </div>
+        )}
+
         <div className="tool-group">
-          <button className="tool-btn" onClick={handleZoomOut} title="缩小">
+          <button className="tool-btn" onClick={() => setScale((prev) => Math.max(prev / 1.2, 0.1))} title="缩小">
             <ZoomOut size={16} />
           </button>
           <span className="zoom-level">{Math.round(scale * 100)}%</span>
-          <button className="tool-btn" onClick={handleZoomIn} title="放大">
+          <button className="tool-btn" onClick={() => setScale((prev) => Math.min(prev * 1.2, 5))} title="放大">
             <ZoomIn size={16} />
           </button>
-          <button className="tool-btn" onClick={handleFitScreen} title="适应屏幕">
+          <button className="tool-btn" onClick={() => { if (imageRef.current) fitToScreen(imageRef.current.width, imageRef.current.height) }} title="适应屏幕">
             适应
           </button>
         </div>
@@ -582,7 +643,7 @@ export default function LetteringCanvas() {
       <div
         ref={containerRef}
         className="canvas-wrapper"
-        style={{ cursor: toolMode === 'pan' || isPanning ? (isPanning ? 'grabbing' : 'grab') : 'default' }}
+        style={{ cursor: cursorStyle }}
       >
         <canvas
           id="lettering-canvas"

@@ -57,6 +57,49 @@
   flex-shrink: 0;
 }
 
+.page-move-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 6px 16px;
+  background-color: #2a2a2d;
+  border-bottom: 1px solid #3e3e42;
+  flex-shrink: 0;
+}
+
+.page-line-count {
+  font-size: 11px;
+  color: #aaa;
+  font-weight: 500;
+}
+
+.page-move-btns {
+  display: flex;
+  gap: 4px;
+}
+
+.move-page-btn {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 8px;
+  border-radius: 3px;
+  background-color: #3e3e42;
+  color: #aaa;
+  font-size: 11px;
+  transition: background-color 0.15s;
+}
+
+.move-page-btn:hover:not(:disabled) {
+  background-color: #4a4a4e;
+  color: #ccc;
+}
+
+.move-page-btn:disabled {
+  opacity: 0.3;
+  cursor: not-allowed;
+}
+
 .stat {
   display: flex;
   align-items: center;

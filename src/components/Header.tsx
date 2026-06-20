@@ -75,13 +75,17 @@ export default function Header() {
   }, [])
 
   const handleExportCurrent = useCallback(async () => {
-    const canvas = document.querySelector('#lettering-canvas') as HTMLCanvasElement
-    if (!canvas) return
-    
-    const dataUrl = canvas.toDataURL('image/png')
-    const fileName = `page_${String(currentPageIndex + 1).padStart(3, '0')}.png`
-    await exportImage(dataUrl, fileName)
-  }, [currentPageIndex])
+    const state = useProjectStore.getState()
+    const page = state.pages[state.currentPageIndex]
+    if (!page) return
+    try {
+      const dataUrl = await renderPageToDataUrl(page, state.textBoxes)
+      const fileName = `page_${String(state.currentPageIndex + 1).padStart(3, '0')}.png`
+      await exportImage(dataUrl, fileName)
+    } catch (e) {
+      alert('导出失败')
+    }
+  }, [])
 
   const handlePrevPage = useCallback(() => {
     if (currentPageIndex > 0) {

@@ -10,6 +10,8 @@ import {
   Circle,
   Type,
   ListPlus,
+  ArrowUpToLine,
+  ArrowDownToLine,
 } from 'lucide-react'
 import './DialogueList.css'
 
@@ -18,6 +20,8 @@ const statusConfig: Record<LineStatus, { icon: typeof Circle; color: string; lab
   embedded: { icon: CheckCircle, color: '#4caf50', label: '已嵌入' },
   needs_rework: { icon: AlertCircle, color: '#ff9800', label: '需重修' },
 }
+
+const PAGE_SEP_RE = /^---+\s*(?:第?\s*\d+\s*页|p(?:age)?\s*\d+|page\s*\d+)?\s*$/i
 
 export default function DialogueList() {
   const {
@@ -28,11 +32,13 @@ export default function DialogueList() {
     selectLine,
     addDialogueLine,
     addDialogueLines,
+    addDialogueLinesMultiPage,
     updateDialogueLine,
     removeDialogueLine,
     setDialogueStatus,
     selectTextBox,
     textBoxes,
+    moveLinesToPage,
   } = useProjectStore()
 
   const [batchInput, setBatchInput] = useState('')
@@ -43,6 +49,10 @@ export default function DialogueList() {
   const currentPageLines = dialogueLines
     .filter((l) => l.pageIndex === currentPageIndex)
     .sort((a, b) => a.order - b.order)
+
+  const pageLineCounts = pages.map((_, i) =>
+    dialogueLines.filter((l) => l.pageIndex === i).length
+  )
 
   useEffect(() => {
     if (showBatchInput && textareaRef.current) {
@@ -59,13 +69,40 @@ export default function DialogueList() {
 
   const handleBatchAdd = () => {
     if (!currentPage || !batchInput.trim()) return
-    const lines = batchInput
-      .split('\n')
-      .map((line) => line.trim())
-      .filter((line) => line.length > 0)
-    if (lines.length > 0) {
-      addDialogueLines(currentPageIndex, lines)
+
+    const sections = batchInput.split('\n').reduce<{ pageIndex: number; lines: string[] }[]>((acc, rawLine) => {
+      const trimmed = rawLine.trim()
+      if (PAGE_SEP_RE.test(trimmed) && pages.length > 0) {
+        const pageNumMatch = trimmed.match(/\d+/)
+        if (pageNumMatch) {
+          const pageNum = parseInt(pageNumMatch[0]) - 1
+          if (pageNum >= 0 && pageNum < pages.length) {
+            acc.push({ pageIndex: pageNum, lines: [] })
+            return acc
+          }
+        }
+        const nextIdx = acc.length > 0 ? Math.min(acc[acc.length - 1].pageIndex + 1, pages.length - 1) : 0
+        acc.push({ pageIndex: nextIdx, lines: [] })
+        return acc
+      }
+      if (trimmed.length > 0) {
+        if (acc.length === 0) {
+          acc.push({ pageIndex: currentPageIndex, lines: [] })
+        }
+        acc[acc.length - 1].lines.push(trimmed)
+      }
+      return acc
+    }, [])
+
+    if (sections.length === 1 && sections[0].pageIndex === currentPageIndex) {
+      addDialogueLines(currentPageIndex, sections[0].lines)
+    } else if (sections.length > 0) {
+      const validSections = sections.filter((s) => s.lines.length > 0).map((s) => ({ pageIndex: s.pageIndex, texts: s.lines }))
+      if (validSections.length > 0) {
+        addDialogueLinesMultiPage(validSections)
+      }
     }
+
     setBatchInput('')
     setShowBatchInput(false)
   }
@@ -188,8 +225,8 @@ export default function DialogueList() {
             ref={textareaRef}
             value={batchInput}
             onChange={(e) => setBatchInput(e.target.value)}
-            placeholder="每行一条台词，粘贴后点击确认..."
-            rows={6}
+            placeholder={`每行一条台词。支持多页粘贴，用 --- 或 --- 第N页 --- 分隔不同页\n例如:\n第一页台词1\n第一页台词2\n---\n第二页台词1\n第二页台词2`}
+            rows={8}
           />
           <div className="batch-actions">
             <button className="btn btn-primary" onClick={handleBatchAdd}>
@@ -201,6 +238,32 @@ export default function DialogueList() {
           </div>
         </div>
       )}
+
+      <div className="page-move-bar">
+        <span className="page-line-count">
+          第{currentPageIndex + 1}页: {pageLineCounts[currentPageIndex]}条
+        </span>
+        <div className="page-move-btns">
+          <button
+            className="move-page-btn"
+            onClick={() => moveLinesToPage(currentPageIndex, currentPageIndex - 1)}
+            disabled={currentPageIndex <= 0 || pageLineCounts[currentPageIndex] === 0}
+            title="将本页所有台词移到上一页"
+          >
+            <ArrowUpToLine size={14} />
+            上移
+          </button>
+          <button
+            className="move-page-btn"
+            onClick={() => moveLinesToPage(currentPageIndex, currentPageIndex + 1)}
+            disabled={currentPageIndex >= pages.length - 1 || pageLineCounts[currentPageIndex] === 0}
+            title="将本页所有台词移到下一页"
+          >
+            下移
+            <ArrowDownToLine size={14} />
+          </button>
+        </div>
+      </div>
 
       <div className="lines-container">
         {currentPageLines.length === 0 ? (

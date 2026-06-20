@@ -21,10 +21,14 @@ export const useProjectStore = create<ProjectState & {
   removePage: (index: number) => void
   addDialogueLine: (pageIndex: number, text: string) => void
   addDialogueLines: (pageIndex: number, texts: string[]) => void
+  addDialogueLinesMultiPage: (pagesTexts: { pageIndex: number; texts: string[] }[]) => void
   updateDialogueLine: (id: string, updates: Partial<DialogueLine>) => void
   removeDialogueLine: (id: string) => void
   setDialogueStatus: (id: string, status: LineStatus) => void
   selectLine: (id: string | null) => void
+  selectNextUnembeddedLine: () => void
+  selectPrevLine: () => void
+  moveLinesToPage: (fromPageIndex: number, toPageIndex: number) => void
   addTextBox: (textBox: Omit<TextBox, 'id'>) => string
   updateTextBox: (id: string, updates: Partial<TextBox>) => void
   removeTextBox: (id: string) => void
@@ -108,6 +112,26 @@ export const useProjectStore = create<ProjectState & {
       return { dialogueLines: [...state.dialogueLines, ...newLines] }
     }),
 
+  addDialogueLinesMultiPage: (pagesTexts) =>
+    set((state) => {
+      const allNewLines: DialogueLine[] = []
+      pagesTexts.forEach(({ pageIndex, texts }) => {
+        const pageLines = state.dialogueLines.filter((l) => l.pageIndex === pageIndex).length
+          + allNewLines.filter((l) => l.pageIndex === pageIndex).length
+        texts.forEach((text, i) => {
+          allNewLines.push({
+            id: generateId(),
+            pageIndex,
+            order: pageLines + i,
+            text,
+            status: 'unembedded',
+            textBoxId: null,
+          })
+        })
+      })
+      return { dialogueLines: [...state.dialogueLines, ...allNewLines] }
+    }),
+
   updateDialogueLine: (id, updates) =>
     set((state) => ({
       dialogueLines: state.dialogueLines.map((l) => (l.id === id ? { ...l, ...updates } : l)),
@@ -136,6 +160,93 @@ export const useProjectStore = create<ProjectState & {
     })),
 
   selectLine: (id) => set({ selectedLineId: id }),
+
+  selectNextUnembeddedLine: () =>
+    set((state) => {
+      const currentPageLines = state.dialogueLines
+        .filter((l) => l.pageIndex === state.currentPageIndex)
+        .sort((a, b) => a.order - b.order)
+
+      const currentIdx = currentPageLines.findIndex((l) => l.id === state.selectedLineId)
+      const searchStart = currentIdx >= 0 ? currentIdx + 1 : 0
+
+      for (let i = searchStart; i < currentPageLines.length; i++) {
+        if (currentPageLines[i].status === 'unembedded' || currentPageLines[i].status === 'needs_rework') {
+          const nextLine = currentPageLines[i]
+          return {
+            selectedLineId: nextLine.id,
+            selectedTextBoxId: nextLine.textBoxId || null,
+          }
+        }
+      }
+
+      for (let i = 0; i < searchStart; i++) {
+        if (currentPageLines[i].status === 'unembedded' || currentPageLines[i].status === 'needs_rework') {
+          const nextLine = currentPageLines[i]
+          return {
+            selectedLineId: nextLine.id,
+            selectedTextBoxId: nextLine.textBoxId || null,
+          }
+        }
+      }
+
+      return {}
+    }),
+
+  selectPrevLine: () =>
+    set((state) => {
+      const currentPageLines = state.dialogueLines
+        .filter((l) => l.pageIndex === state.currentPageIndex)
+        .sort((a, b) => a.order - b.order)
+
+      const currentIdx = currentPageLines.findIndex((l) => l.id === state.selectedLineId)
+      if (currentIdx <= 0) return {}
+      const prevLine = currentPageLines[currentIdx - 1]
+      return {
+        selectedLineId: prevLine.id,
+        selectedTextBoxId: prevLine.textBoxId || null,
+      }
+    }),
+
+  moveLinesToPage: (fromPageIndex, toPageIndex) =>
+    set((state) => {
+      if (toPageIndex < 0 || toPageIndex >= state.pages.length) return state
+      const linesToMove = state.dialogueLines.filter((l) => l.pageIndex === fromPageIndex)
+      if (linesToMove.length === 0) return state
+
+      const existingTargetLines = state.dialogueLines.filter((l) => l.pageIndex === toPageIndex)
+      const maxOrder = existingTargetLines.length > 0
+        ? Math.max(...existingTargetLines.map((l) => l.order)) + 1
+        : 0
+
+      const movedLines = linesToMove.map((l, i) => ({
+        ...l,
+        pageIndex: toPageIndex,
+        order: maxOrder + i,
+      }))
+
+      const movedLineIds = new Set(movedLines.map((l) => l.id))
+      const remainingLines = state.dialogueLines
+        .filter((l) => !movedLineIds.has(l.id))
+        .map((l) => {
+          if (l.pageIndex !== fromPageIndex) return l
+          return { ...l }
+        })
+
+      const movedTextBoxIds = new Set(
+        movedLines.filter((l) => l.textBoxId).map((l) => l.textBoxId!)
+      )
+      const movedTextBoxes = state.textBoxes
+        .filter((t) => movedTextBoxIds.has(t.id))
+        .map((t) => ({ ...t, pageIndex: toPageIndex }))
+
+      const otherTextBoxes = state.textBoxes.filter((t) => !movedTextBoxIds.has(t.id))
+
+      return {
+        dialogueLines: [...remainingLines, ...movedLines],
+        textBoxes: [...otherTextBoxes, ...movedTextBoxes],
+      }
+    }),
 
   addTextBox: (textBox) => {
     const id = generateId()

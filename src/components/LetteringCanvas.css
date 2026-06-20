@@ -87,3 +87,85 @@
 .empty-state p {
   font-size: 14px;
 }
+
+.lettering-stepper {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 2px 10px;
+  background-color: #1e3a1e;
+  border: 1px solid #2d5a2d;
+  border-radius: 6px;
+  font-size: 12px;
+}
+
+.stepper-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  border-radius: 4px;
+  color: #cccccc;
+  transition: background-color 0.15s;
+}
+
+.stepper-btn:hover:not(:disabled) {
+  background-color: #3e3e42;
+}
+
+.stepper-btn:disabled {
+  opacity: 0.3;
+  cursor: not-allowed;
+}
+
+.stepper-btn.rework-btn {
+  color: #ff9800;
+}
+
+.stepper-btn.rework-btn:hover:not(:disabled) {
+  background-color: #4a3020;
+}
+
+.stepper-btn.export-btn {
+  width: auto;
+  padding: 0 8px;
+  color: #4caf50;
+  font-size: 12px;
+}
+
+.stepper-btn.export-btn:hover:not(:disabled) {
+  background-color: #2d4a2d;
+}
+
+.stepper-info {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-weight: 500;
+  color: #8bc34a;
+  min-width: 80px;
+  justify-content: center;
+}
+
+.stepper-status {
+  font-size: 10px;
+  padding: 1px 6px;
+  border-radius: 3px;
+  font-weight: 400;
+}
+
+.stepper-status.status-unembedded {
+  background-color: #333;
+  color: #888;
+}
+
+.stepper-status.status-embedded {
+  background-color: #1b5e20;
+  color: #4caf50;
+}
+
+.stepper-status.status-needs_rework {
+  background-color: #4a3000;
+  color: #ff9800;
+}

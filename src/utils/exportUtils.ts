@@ -8,7 +8,7 @@ export const renderPageToDataUrl = (page: Page, textBoxes: TextBox[]): Promise<s
       canvas.width = img.width
       canvas.height = img.height
       const ctx = canvas.getContext('2d')
-      
+
       if (!ctx) {
         reject(new Error('无法创建 canvas 上下文'))
         return
@@ -35,7 +35,7 @@ export const renderPageToDataUrl = (page: Page, textBoxes: TextBox[]): Promise<s
   })
 }
 
-const drawText = (
+function drawText(
   ctx: CanvasRenderingContext2D,
   text: string,
   x: number,
@@ -43,7 +43,7 @@ const drawText = (
   width: number,
   height: number,
   style: TextBoxStyle
-) => {
+) {
   if (style.isVertical) {
     drawVerticalText(ctx, text, x, y, width, height, style)
   } else {
@@ -51,7 +51,7 @@ const drawText = (
   }
 }
 
-const drawHorizontalText = (
+function drawHorizontalText(
   ctx: CanvasRenderingContext2D,
   text: string,
   x: number,
@@ -59,13 +59,13 @@ const drawHorizontalText = (
   width: number,
   height: number,
   style: TextBoxStyle
-) => {
+) {
   const { fontFamily, fontSize, lineHeight, strokeWidth, strokeColor, fillColor, bold, italic } = style
   const fontStyle = `${italic ? 'italic ' : ''}${bold ? 'bold ' : ''}${fontSize}px ${fontFamily}`
   ctx.font = fontStyle
   ctx.textBaseline = 'top'
 
-  const lines = wrapText(ctx, text, width)
+  const lines = wrapText(ctx, text, Math.max(width, fontSize))
   const totalHeight = lines.length * fontSize * lineHeight
   const startY = y + (height - totalHeight) / 2
 
@@ -80,13 +80,12 @@ const drawHorizontalText = (
       ctx.lineJoin = 'round'
       ctx.strokeText(line, lineX, lineY)
     }
-
     ctx.fillStyle = fillColor
     ctx.fillText(line, lineX, lineY)
   })
 }
 
-const drawVerticalText = (
+function drawVerticalText(
   ctx: CanvasRenderingContext2D,
   text: string,
   x: number,
@@ -94,31 +93,34 @@ const drawVerticalText = (
   width: number,
   height: number,
   style: TextBoxStyle
-) => {
+) {
   const { fontFamily, fontSize, lineHeight, strokeWidth, strokeColor, fillColor, bold, italic } = style
   const fontStyle = `${italic ? 'italic ' : ''}${bold ? 'bold ' : ''}${fontSize}px ${fontFamily}`
   ctx.font = fontStyle
   ctx.textBaseline = 'top'
 
-  const chars = text.split('')
-  const charHeight = fontSize
-  const lineHeight_ = fontSize * lineHeight
+  const colWidth = fontSize * lineHeight
+  const maxCols = Math.max(1, Math.floor(width / colWidth))
+  const maxRows = Math.max(1, Math.floor(height / fontSize))
 
-  const totalWidth = Math.ceil(chars.length / Math.floor(height / charHeight)) * lineHeight_
-  const startX = x + (width - totalWidth) / 2 + lineHeight_ / 2
+  const chars = text.replace(/\n/g, '').split('')
+  const totalCols = Math.ceil(chars.length / maxRows)
+  const actualTotalWidth = totalCols * colWidth
+  const startOffsetX = (width - actualTotalWidth) / 2
 
   let col = 0
   let row = 0
-  const maxRows = Math.floor(height / charHeight)
+  const centerX = x + width / 2
 
-  chars.forEach((char) => {
+  for (const char of chars) {
     if (row >= maxRows) {
       row = 0
       col++
     }
+    if (col >= maxCols) break
 
-    const charX = startX - col * lineHeight_ - fontSize / 2
-    const charY = y + row * charHeight + (height - maxRows * charHeight) / 2
+    const charX = centerX + startOffsetX + (maxCols - 1 - col) * colWidth + (colWidth - fontSize) / 2
+    const charY = y + row * fontSize
 
     if (strokeWidth > 0) {
       ctx.strokeStyle = strokeColor
@@ -126,15 +128,14 @@ const drawVerticalText = (
       ctx.lineJoin = 'round'
       ctx.strokeText(char, charX, charY)
     }
-
     ctx.fillStyle = fillColor
     ctx.fillText(char, charX, charY)
 
     row++
-  })
+  }
 }
 
-const wrapText = (ctx: CanvasRenderingContext2D, text: string, maxWidth: number): string[] => {
+function wrapText(ctx: CanvasRenderingContext2D, text: string, maxWidth: number): string[] {
   const lines: string[] = []
   const paragraphs = text.split('\n')
 
