@@ -5,14 +5,16 @@ import DialogueList from './components/DialogueList'
 import LetteringCanvas from './components/LetteringCanvas'
 import StylePanel from './components/StylePanel'
 import ProgressPanel from './components/ProgressPanel'
+import ReviewPanel from './components/ReviewPanel'
 import './App.css'
 
 export default function App() {
   const [showProgress, setShowProgress] = useState(false)
+  const [showReview, setShowReview] = useState(false)
 
   return (
     <div className="app">
-      <Header onOpenProgress={() => setShowProgress(true)} />
+      <Header onOpenProgress={() => setShowProgress(true)} onOpenReview={() => setShowReview(true)} />
       <div className="main-content">
         <PageThumbnails />
         <aside className="left-panel">
@@ -26,6 +28,7 @@ export default function App() {
         </aside>
       </div>
       {showProgress && <ProgressPanel onClose={() => setShowProgress(false)} />}
+      {showReview && <ReviewPanel onClose={() => setShowReview(false)} />}
     </div>
   )
 }

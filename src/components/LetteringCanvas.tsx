@@ -439,8 +439,8 @@ export default function LetteringCanvas() {
         updateDialogueLine(selectedLine.id, { textBoxId })
         setDialogueStatus(selectedLine.id, 'embedded')
         selectTextBox(textBoxId)
+        selectNextPendingLine()
       }
-      selectNextPendingLine()
       return
     }
 

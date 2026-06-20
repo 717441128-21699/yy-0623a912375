@@ -19,9 +19,10 @@ import './Header.css'
 
 interface HeaderProps {
   onOpenProgress: () => void
+  onOpenReview: () => void
 }
 
-export default function Header({ onOpenProgress }: HeaderProps) {
+export default function Header({ onOpenProgress, onOpenReview }: HeaderProps) {
   const {
     pages,
     currentPageIndex,
@@ -257,6 +258,10 @@ export default function Header({ onOpenProgress }: HeaderProps) {
             <button onClick={handleExportAll} disabled={isExporting}>
               <Layers size={14} />
               批量导出全部
+            </button>
+            <button onClick={onOpenReview} disabled={isExporting}>
+              <AlertTriangle size={14} />
+              整话检查后导出
             </button>
           </div>
         </div>

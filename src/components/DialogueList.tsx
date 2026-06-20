@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from 'react'
+import { useState, useMemo, useRef, useEffect } from 'react'
 import { useProjectStore } from '../store/useProjectStore'
 import { LineStatus } from '../types'
 import {
@@ -12,6 +12,8 @@ import {
   ListPlus,
   ArrowUpToLine,
   ArrowDownToLine,
+  Search,
+  X,
 } from 'lucide-react'
 import './DialogueList.css'
 
@@ -39,11 +41,14 @@ export default function DialogueList() {
     selectTextBox,
     textBoxes,
     moveLinesToPage,
+    setCurrentPage,
   } = useProjectStore()
 
   const [batchInput, setBatchInput] = useState('')
   const [showBatchInput, setShowBatchInput] = useState(false)
   const [draggedId, setDraggedId] = useState<string | null>(null)
+  const [searchText, setSearchText] = useState('')
+  const [statusFilter, setStatusFilter] = useState<LineStatus | 'all'>('all')
   const textareaRef = useRef<HTMLTextAreaElement>(null)
 
   const currentPageLines = dialogueLines
@@ -53,6 +58,22 @@ export default function DialogueList() {
   const pageLineCounts = pages.map((_, i) =>
     dialogueLines.filter((l) => l.pageIndex === i).length
   )
+
+  const filteredLines = useMemo(() => {
+    const lowerSearch = searchText.trim().toLowerCase()
+    return dialogueLines
+      .filter((l) => {
+        if (statusFilter !== 'all' && l.status !== statusFilter) return false
+        if (lowerSearch && !l.text.toLowerCase().includes(lowerSearch)) return false
+        return true
+      })
+      .sort((a, b) => {
+        if (a.pageIndex !== b.pageIndex) return a.pageIndex - b.pageIndex
+        return a.order - b.order
+      })
+  }, [dialogueLines, searchText, statusFilter])
+
+  const isFiltering = searchText.trim() !== '' || statusFilter !== 'all'
 
   useEffect(() => {
     if (showBatchInput && textareaRef.current) {
@@ -122,6 +143,9 @@ export default function DialogueList() {
   }
 
   const handleLineClick = (line: typeof dialogueLines[0]) => {
+    if (line.pageIndex !== currentPageIndex) {
+      setCurrentPage(line.pageIndex)
+    }
     selectLine(line.id)
     if (line.textBoxId) {
       selectTextBox(line.textBoxId)
@@ -204,6 +228,70 @@ export default function DialogueList() {
         </div>
       </div>
 
+      <div className="search-bar">
+        <div className="search-input-wrapper">
+          <Search size={14} className="search-icon" />
+          <input
+            type="text"
+            className="search-input"
+            value={searchText}
+            onChange={(e) => setSearchText(e.target.value)}
+            placeholder="搜索台词内容..."
+          />
+          {searchText && (
+            <button
+              className="search-clear-btn"
+              onClick={() => setSearchText('')}
+              title="清除搜索"
+            >
+              <X size={12} />
+            </button>
+          )}
+        </div>
+      </div>
+
+      <div className="filter-bar">
+        <button
+          className={`filter-btn ${statusFilter === 'all' ? 'active' : ''}`}
+          onClick={() => setStatusFilter('all')}
+          title="显示全部"
+        >
+          全部
+        </button>
+        <button
+          className={`filter-btn ${statusFilter === 'unembedded' ? 'active' : ''}`}
+          onClick={() => setStatusFilter('unembedded')}
+          title="只显示未嵌入"
+        >
+          <Circle size={10} />
+          未嵌入
+        </button>
+        <button
+          className={`filter-btn ${statusFilter === 'embedded' ? 'active' : ''}`}
+          onClick={() => setStatusFilter('embedded')}
+          title="只显示已嵌入"
+        >
+          <CheckCircle size={10} />
+          已嵌入
+        </button>
+        <button
+          className={`filter-btn ${statusFilter === 'needs_rework' ? 'active' : ''}`}
+          onClick={() => setStatusFilter('needs_rework')}
+          title="只显示需重修"
+        >
+          <AlertCircle size={10} />
+          需重修
+        </button>
+      </div>
+
+      {isFiltering && (
+        <div className="filter-info">
+          找到 <strong>{filteredLines.length}</strong> 条结果
+          {searchText && <> · 关键词: <em>"{searchText.trim()}"</em></>}
+          {statusFilter !== 'all' && <> · 状态: <em>{statusConfig[statusFilter].label}</em></>}
+        </div>
+      )}
+
       <div className="stats-bar">
         <span className="stat">
           <Circle size={12} color="#888" />
@@ -239,87 +327,149 @@ export default function DialogueList() {
         </div>
       )}
 
-      <div className="page-move-bar">
-        <span className="page-line-count">
-          第{currentPageIndex + 1}页: {pageLineCounts[currentPageIndex]}条
-        </span>
-        <div className="page-move-btns">
-          <button
-            className="move-page-btn"
-            onClick={() => moveLinesToPage(currentPageIndex, currentPageIndex - 1)}
-            disabled={currentPageIndex <= 0 || pageLineCounts[currentPageIndex] === 0}
-            title="将本页所有台词移到上一页"
-          >
-            <ArrowUpToLine size={14} />
-            上移
-          </button>
-          <button
-            className="move-page-btn"
-            onClick={() => moveLinesToPage(currentPageIndex, currentPageIndex + 1)}
-            disabled={currentPageIndex >= pages.length - 1 || pageLineCounts[currentPageIndex] === 0}
-            title="将本页所有台词移到下一页"
-          >
-            下移
-            <ArrowDownToLine size={14} />
-          </button>
+      {!isFiltering && (
+        <div className="page-move-bar">
+          <span className="page-line-count">
+            第{currentPageIndex + 1}页: {pageLineCounts[currentPageIndex]}条
+          </span>
+          <div className="page-move-btns">
+            <button
+              className="move-page-btn"
+              onClick={() => moveLinesToPage(currentPageIndex, currentPageIndex - 1)}
+              disabled={currentPageIndex <= 0 || pageLineCounts[currentPageIndex] === 0}
+              title="将本页所有台词移到上一页"
+            >
+              <ArrowUpToLine size={14} />
+              上移
+            </button>
+            <button
+              className="move-page-btn"
+              onClick={() => moveLinesToPage(currentPageIndex, currentPageIndex + 1)}
+              disabled={currentPageIndex >= pages.length - 1 || pageLineCounts[currentPageIndex] === 0}
+              title="将本页所有台词移到下一页"
+            >
+              下移
+              <ArrowDownToLine size={14} />
+            </button>
+          </div>
         </div>
-      </div>
+      )}
 
       <div className="lines-container">
-        {currentPageLines.length === 0 ? (
-          <div className="empty-lines">
-            <p>暂无台词</p>
-            <p className="hint">点击 + 添加或批量粘贴</p>
-          </div>
+        {isFiltering ? (
+          filteredLines.length === 0 ? (
+            <div className="empty-lines">
+              <p>没有匹配的台词</p>
+              <p className="hint">尝试修改搜索词或筛选条件</p>
+            </div>
+          ) : (
+            filteredLines.map((line) => {
+              const StatusIcon = statusConfig[line.status].icon
+              const textBox = getLineTextBox(line.id)
+              const isOtherPage = line.pageIndex !== currentPageIndex
+              return (
+                <div
+                  key={line.id}
+                  className={`line-item ${selectedLineId === line.id ? 'selected' : ''} ${isOtherPage ? 'other-page' : ''}`}
+                  onClick={() => handleLineClick(line)}
+                >
+                  <div className="line-number search-mode">
+                    {isOtherPage ? (
+                      <span className="line-page-badge">
+                        P{line.pageIndex + 1}·{line.order + 1}
+                      </span>
+                    ) : (
+                      line.order + 1
+                    )}
+                  </div>
+                  <button
+                    className="status-btn"
+                    onClick={(e) => handleStatusClick(line.id, e)}
+                    title={`${statusConfig[line.status].label}（点击切换）`}
+                  >
+                    <StatusIcon size={16} color={statusConfig[line.status].color} />
+                  </button>
+                  <div className="line-content">
+                    <textarea
+                      value={line.text}
+                      onChange={(e) => handleTextChange(line.id, e.target.value)}
+                      onClick={(e) => e.stopPropagation()}
+                      placeholder="输入台词..."
+                      rows={2}
+                    />
+                    {textBox && (
+                      <div className="line-textbox-info">
+                        位置: ({Math.round(textBox.x)}, {Math.round(textBox.y)})
+                      </div>
+                    )}
+                  </div>
+                  <button
+                    className="delete-btn"
+                    onClick={(e) => handleDeleteLine(line.id, e)}
+                    title="删除"
+                  >
+                    <Trash2 size={14} />
+                  </button>
+                </div>
+              )
+            })
+          )
         ) : (
-          currentPageLines.map((line, index) => {
-            const StatusIcon = statusConfig[line.status].icon
-            const textBox = getLineTextBox(line.id)
-            return (
-              <div
-                key={line.id}
-                className={`line-item ${selectedLineId === line.id ? 'selected' : ''} ${draggedId === line.id ? 'dragging' : ''}`}
-                draggable
-                onDragStart={(e) => handleDragStart(e, line.id)}
-                onDragOver={handleDragOver}
-                onDrop={(e) => handleDrop(e, line.id)}
-                onClick={() => handleLineClick(line)}
-              >
-                <div className="line-drag-handle">
-                  <GripVertical size={14} />
-                </div>
-                <div className="line-number">{index + 1}</div>
-                <button
-                  className="status-btn"
-                  onClick={(e) => handleStatusClick(line.id, e)}
-                  title={`${statusConfig[line.status].label}（点击切换）`}
+          currentPageLines.length === 0 ? (
+            <div className="empty-lines">
+              <p>暂无台词</p>
+              <p className="hint">点击 + 添加或批量粘贴</p>
+            </div>
+          ) : (
+            currentPageLines.map((line, index) => {
+              const StatusIcon = statusConfig[line.status].icon
+              const textBox = getLineTextBox(line.id)
+              return (
+                <div
+                  key={line.id}
+                  className={`line-item ${selectedLineId === line.id ? 'selected' : ''} ${draggedId === line.id ? 'dragging' : ''}`}
+                  draggable
+                  onDragStart={(e) => handleDragStart(e, line.id)}
+                  onDragOver={handleDragOver}
+                  onDrop={(e) => handleDrop(e, line.id)}
+                  onClick={() => handleLineClick(line)}
                 >
-                  <StatusIcon size={16} color={statusConfig[line.status].color} />
-                </button>
-                <div className="line-content">
-                  <textarea
-                    value={line.text}
-                    onChange={(e) => handleTextChange(line.id, e.target.value)}
-                    onClick={(e) => e.stopPropagation()}
-                    placeholder="输入台词..."
-                    rows={2}
-                  />
-                  {textBox && (
-                    <div className="line-textbox-info">
-                      位置: ({Math.round(textBox.x)}, {Math.round(textBox.y)})
-                    </div>
-                  )}
+                  <div className="line-drag-handle">
+                    <GripVertical size={14} />
+                  </div>
+                  <div className="line-number">{index + 1}</div>
+                  <button
+                    className="status-btn"
+                    onClick={(e) => handleStatusClick(line.id, e)}
+                    title={`${statusConfig[line.status].label}（点击切换）`}
+                  >
+                    <StatusIcon size={16} color={statusConfig[line.status].color} />
+                  </button>
+                  <div className="line-content">
+                    <textarea
+                      value={line.text}
+                      onChange={(e) => handleTextChange(line.id, e.target.value)}
+                      onClick={(e) => e.stopPropagation()}
+                      placeholder="输入台词..."
+                      rows={2}
+                    />
+                    {textBox && (
+                      <div className="line-textbox-info">
+                        位置: ({Math.round(textBox.x)}, {Math.round(textBox.y)})
+                      </div>
+                    )}
+                  </div>
+                  <button
+                    className="delete-btn"
+                    onClick={(e) => handleDeleteLine(line.id, e)}
+                    title="删除"
+                  >
+                    <Trash2 size={14} />
+                  </button>
                 </div>
-                <button
-                  className="delete-btn"
-                  onClick={(e) => handleDeleteLine(line.id, e)}
-                  title="删除"
-                >
-                  <Trash2 size={14} />
-                </button>
-              </div>
-            )
-          })
+              )
+            })
+          )
         )}
       </div>
     </div>
