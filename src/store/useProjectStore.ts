@@ -1,5 +1,5 @@
 import { create } from 'zustand'
-import { ProjectState, Page, DialogueLine, TextBox, LineStatus, TextBoxStyle } from '../types'
+import { ProjectState, Page, DialogueLine, TextBox, LineStatus, TextBoxStyle, StylePreset } from '../types'
 
 const generateId = () => Math.random().toString(36).slice(2, 11)
 
@@ -14,6 +14,73 @@ const defaultStyle: TextBoxStyle = {
   bold: true,
   italic: false,
 }
+
+const builtInPresets: StylePreset[] = [
+  {
+    id: 'builtin-dialogue',
+    name: '对白',
+    isBuiltIn: true,
+    style: {
+      fontFamily: 'Microsoft YaHei',
+      fontSize: 18,
+      lineHeight: 1.4,
+      isVertical: false,
+      strokeWidth: 2,
+      strokeColor: '#000000',
+      fillColor: '#ffffff',
+      bold: true,
+      italic: false,
+    },
+  },
+  {
+    id: 'builtin-narration',
+    name: '旁白',
+    isBuiltIn: true,
+    style: {
+      fontFamily: 'SimSun',
+      fontSize: 16,
+      lineHeight: 1.6,
+      isVertical: false,
+      strokeWidth: 2,
+      strokeColor: '#000000',
+      fillColor: '#ffffff',
+      bold: false,
+      italic: false,
+    },
+  },
+  {
+    id: 'builtin-shout',
+    name: '喊叫',
+    isBuiltIn: true,
+    style: {
+      fontFamily: 'SimHei',
+      fontSize: 26,
+      lineHeight: 1.2,
+      isVertical: false,
+      strokeWidth: 3,
+      strokeColor: '#000000',
+      fillColor: '#ff4444',
+      bold: true,
+      italic: false,
+    },
+  },
+  {
+    id: 'builtin-note',
+    name: '注释',
+    isBuiltIn: true,
+    style: {
+      fontFamily: 'Microsoft YaHei',
+      fontSize: 12,
+      lineHeight: 1.5,
+      isVertical: false,
+      strokeWidth: 1,
+      strokeColor: '#000000',
+      fillColor: '#cccccc',
+      bold: false,
+      italic: true,
+    },
+  },
+]
 
 export const useProjectStore = create<ProjectState & {
   addPages: (images: { path: string; dataUrl: string; fileName: string }[]) => void
@@ -45,6 +112,11 @@ export const useProjectStore = create<ProjectState & {
   getAllPageStats: () => Array<{ pageIndex: number; total: number; unembedded: number; embedded: number; needs_rework: number }>
   findNeedsReworkLine: (fromPageIndex?: number, fromOrder?: number) => { pageIndex: number; lineId: string } | null
   reorderLines: (pageIndex: number, lineIds: string[]) => void
+  addStylePreset: (name: string, style: TextBoxStyle) => string
+  removeStylePreset: (id: string) => void
+  renameStylePreset: (id: string, name: string) => void
+  applyPresetToTextBox: (textBoxId: string, presetId: string) => void
+  applyPresetAsDefault: (presetId: string) => void
 }>((set, get) => ({
   pages: [],
   currentPageIndex: 0,
@@ -55,6 +127,7 @@ export const useProjectStore = create<ProjectState & {
   projectPath: null,
   projectName: '未命名项目',
   defaultStyle,
+  stylePresets: builtInPresets,
 
   addPages: (images) =>
     set((state) => {
@@ -393,4 +466,52 @@ export const useProjectStore = create<ProjectState & {
         return newOrder >= 0 ? { ...l, order: newOrder } : l
       }),
     })),
+
+  addStylePreset: (name, style) => {
+    const id = `custom-${generateId()}`
+    set((state) => ({
+      stylePresets: [
+        ...state.stylePresets,
+        { id, name, isBuiltIn: false, style: { ...style } },
+      ],
+    }))
+    return id
+  },
+
+  removeStylePreset: (id) =>
+    set((state) => ({
+      stylePresets: state.stylePresets.filter((p) => p.id !== id),
+    })),
+
+  renameStylePreset: (id, name) =>
+    set((state) => ({
+      stylePresets: state.stylePresets.map((p) =>
+        p.id === id ? { ...p, name } : p
+      ),
+    })),
+
+  applyPresetToTextBox: (textBoxId, presetId) =>
+    set((state) => {
+      const preset = state.stylePresets.find((p) => p.id === presetId)
+      if (!preset) return {}
+      return {
+        textBoxes: state.textBoxes.map((t) =>
+          t.id === textBoxId
+            ? {
+                ...t,
+                style: { ...preset.style },
+              }
+            : t
+        ),
+      }
+    }),
+
+  applyPresetAsDefault: (presetId) =>
+    set((state) => {
+      const preset = state.stylePresets.find((p) => p.id === presetId)
+      if (!preset) return {}
+      return {
+        defaultStyle: { ...preset.style },
+      }
+    }),
 }))

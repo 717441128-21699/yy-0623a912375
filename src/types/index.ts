@@ -39,6 +39,13 @@ export interface Page {
   fileName: string
 }
 
+export interface StylePreset {
+  id: string
+  name: string
+  isBuiltIn: boolean
+  style: TextBoxStyle
+}
+
 export interface ProjectState {
   pages: Page[]
   currentPageIndex: number
@@ -49,4 +56,5 @@ export interface ProjectState {
   projectPath: string | null
   projectName: string
   defaultStyle: TextBoxStyle
+  stylePresets: StylePreset[]
 }

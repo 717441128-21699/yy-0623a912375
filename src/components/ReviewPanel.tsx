@@ -69,17 +69,21 @@ export default function ReviewPanel({ onClose }: ReviewPanelProps) {
         })
       }
 
-      if (line.status !== 'unembedded' && !line.textBoxId) {
+      if (!line.textBoxId) {
+        const statusText =
+          line.status === 'needs_rework'
+            ? '需重修'
+            : line.status === 'embedded'
+              ? '已嵌入'
+              : '未嵌入'
         foundIssues.push({
           type: 'missing_textbox',
           pageIndex: line.pageIndex,
           lineId: line.id,
-          description: `${line.status === 'needs_rework' ? '需重修' : '已嵌入'}台词但没有关联文字框`,
+          description: `${statusText}台词没有关联文字框`,
           location: `第${line.pageIndex + 1}页 · #${line.order + 1}`,
         })
-      }
-
-      if (line.textBoxId) {
+      } else {
         const textBox = textBoxes.find((t) => t.id === line.textBoxId)
         if (!textBox) {
           foundIssues.push({
@@ -289,13 +293,14 @@ export default function ReviewPanel({ onClose }: ReviewPanelProps) {
         <div className="review-footer">
           <div className="footer-hint">
             {issues.length > 0
-              ? '点击问题项可直接定位，修复后请重新检查'
+              ? `还有 ${issues.length} 个问题待修复，请修完后重新检查`
               : '所有检查项均通过，可以安全导出'}
           </div>
           <button
-            className="btn-export-all"
+            className={`btn-export-all ${issues.length > 0 ? 'disabled-locked' : ''}`}
             onClick={handleExportAll}
-            disabled={isExporting}
+            disabled={isExporting || issues.length > 0}
+            title={issues.length > 0 ? `还有 ${issues.length} 个问题，请先修复并重新检查` : '确认无误，批量导出所有页面'}
           >
             <Layers size={14} />
             {isExporting ? '导出中...' : '确认无误，批量导出'}

@@ -297,3 +297,16 @@
   opacity: 0.5;
   cursor: not-allowed;
 }
+
+.btn-export-all.disabled-locked {
+  background-color: #555;
+  opacity: 1;
+  cursor: not-allowed;
+  position: relative;
+}
+
+.btn-export-all.disabled-locked::after {
+  content: '🔒';
+  margin-left: 6px;
+  font-size: 11px;
+}

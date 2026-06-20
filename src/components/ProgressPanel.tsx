@@ -7,6 +7,13 @@ interface ProgressPanelProps {
   onClose: () => void
 }
 
+interface ReworkQueueItem {
+  lineId: string
+  pageIndex: number
+  text: string
+  order: number
+}
+
 export default function ProgressPanel({ onClose }: ProgressPanelProps) {
   const {
     pages,
@@ -18,10 +25,12 @@ export default function ProgressPanel({ onClose }: ProgressPanelProps) {
   } = useProjectStore()
 
   const [isReworkMode, setIsReworkMode] = useState(false)
-  const [reworkIndex, setReworkIndex] = useState(0)
-  const [processedCount, setProcessedCount] = useState(0)
+  const [reworkCursor, setReworkCursor] = useState(0)
+  const [sessionQueue, setSessionQueue] = useState<ReworkQueueItem[]>([])
+  const [processedLineIds, setProcessedLineIds] = useState<Set<string>>(new Set())
+  const [skippedLineIds, setSkippedLineIds] = useState<Set<string>>(new Set())
 
-  const reworkQueue = useMemo(() => {
+  const totalReworkQueue = useMemo(() => {
     return pages
       .sort((a, b) => a.index - b.index)
       .flatMap((p) =>
@@ -57,47 +66,74 @@ export default function ProgressPanel({ onClose }: ProgressPanelProps) {
     selectLine(lineId)
   }
 
+  const currentSessionItem = sessionQueue[reworkCursor]
+  const sessionCompleted = sessionQueue.length > 0 && reworkCursor >= sessionQueue.length
+  const sessionCompletedCount = processedLineIds.size
+  const sessionSkippedCount = skippedLineIds.size
+  const sessionRemainingCount = Math.max(0, sessionQueue.length - reworkCursor)
+
   const handleStartRework = () => {
-    if (reworkQueue.length === 0) return
+    if (totalReworkQueue.length === 0) return
+    const snapshot = [...totalReworkQueue]
+    setSessionQueue(snapshot)
+    setReworkCursor(0)
+    setProcessedLineIds(new Set())
+    setSkippedLineIds(new Set())
     setIsReworkMode(true)
-    setReworkIndex(0)
-    setProcessedCount(0)
-    handleJumpToLine(reworkQueue[0].pageIndex, reworkQueue[0].lineId)
+    handleJumpToLine(snapshot[0].pageIndex, snapshot[0].lineId)
   }
 
   const handleStopRework = () => {
     setIsReworkMode(false)
   }
 
-  const handleReworkComplete = () => {
-    if (reworkQueue[reworkIndex]) {
-      setDialogueStatus(reworkQueue[reworkIndex].lineId, 'embedded')
-      setProcessedCount((c) => c + 1)
+  const advanceCursor = (newCursor: number) => {
+    setReworkCursor(newCursor)
+    if (newCursor < sessionQueue.length) {
+      const next = sessionQueue[newCursor]
+      handleJumpToLine(next.pageIndex, next.lineId)
     }
-    handleNextRework()
+  }
+
+  const handleReworkComplete = () => {
+    if (currentSessionItem) {
+      setDialogueStatus(currentSessionItem.lineId, 'embedded')
+      setProcessedLineIds((prev) => {
+        const next = new Set(prev)
+        next.add(currentSessionItem.lineId)
+        return next
+      })
+    }
+    advanceCursor(reworkCursor + 1)
   }
 
   const handleSkipRework = () => {
-    handleNextRework()
+    if (currentSessionItem) {
+      setSkippedLineIds((prev) => {
+        const next = new Set(prev)
+        next.add(currentSessionItem.lineId)
+        return next
+      })
+    }
+    advanceCursor(reworkCursor + 1)
   }
 
   const handlePrevRework = () => {
-    if (reworkIndex > 0) {
-      const nextIdx = reworkIndex - 1
-      setReworkIndex(nextIdx)
-      handleJumpToLine(reworkQueue[nextIdx].pageIndex, reworkQueue[nextIdx].lineId)
+    if (reworkCursor > 0) {
+      advanceCursor(reworkCursor - 1)
     }
   }
 
   const handleNextRework = () => {
-    const nextIdx = reworkIndex + 1
-    if (nextIdx < reworkQueue.length) {
-      setReworkIndex(nextIdx)
-      handleJumpToLine(reworkQueue[nextIdx].pageIndex, reworkQueue[nextIdx].lineId)
+    if (reworkCursor < sessionQueue.length) {
+      advanceCursor(reworkCursor + 1)
     }
   }
 
-  const currentReworkItem = reworkQueue[reworkIndex]
+  const handleRestartSession = () => {
+    handleStopRework()
+    setTimeout(handleStartRework, 0)
+  }
 
   return (
     <div className="progress-panel-overlay" onClick={onClose}>
@@ -112,79 +148,100 @@ export default function ProgressPanel({ onClose }: ProgressPanelProps) {
           </button>
         </div>
 
-        {isReworkMode && currentReworkItem && (
+        {isReworkMode && (
           <div className="rework-mode-bar">
             <div className="rework-mode-status">
               <span className="rework-counter">
-                {reworkIndex + 1} / {reworkQueue.length}
+                {sessionCompleted
+                  ? '全部完成'
+                  : currentSessionItem
+                    ? `${reworkCursor + 1} / ${sessionQueue.length}`
+                    : `0 / ${sessionQueue.length}`}
               </span>
               <span className="rework-session-stats">
-                本次已处理 <strong>{processedCount}</strong> 条
-                {reworkQueue.length > 0 && <>，还剩 <strong>{reworkQueue.length}</strong> 条</>}
+                完成 <strong style={{ color: '#4caf50' }}>{sessionCompletedCount}</strong> 条
+                {sessionSkippedCount > 0 && (
+                  <> · 跳过 <strong style={{ color: '#888' }}>{sessionSkippedCount}</strong> 条</>
+                )}
+                {!sessionCompleted && (
+                  <> · 剩下 <strong style={{ color: '#ff9800' }}>{sessionRemainingCount}</strong> 条</>
+                )}
               </span>
             </div>
-            <div className="rework-mode-nav">
-              <button
-                className="rework-nav-btn"
-                onClick={handlePrevRework}
-                disabled={reworkIndex === 0}
-                title="上一条"
-              >
-                <ChevronLeft size={16} />
-              </button>
-              <button
-                className="rework-nav-btn complete-btn"
-                onClick={handleReworkComplete}
-                title="完成本条并下一条"
-              >
-                <Check size={16} />
-                完成
-              </button>
-              <button
-                className="rework-nav-btn skip-btn"
-                onClick={handleSkipRework}
-                disabled={reworkIndex >= reworkQueue.length - 1}
-                title="跳过本条"
-              >
-                <SkipForward size={16} />
-              </button>
-              <button
-                className="rework-nav-btn"
-                onClick={handleNextRework}
-                disabled={reworkIndex >= reworkQueue.length - 1}
-                title="下一条"
-              >
-                <ChevronRight size={16} />
-              </button>
-              <button
-                className="rework-nav-btn stop-btn"
-                onClick={handleStopRework}
-                title="退出返修模式"
-              >
-                <Square size={14} />
-              </button>
-            </div>
-            <div className="rework-current-line">
-              <span className="rework-line-loc">
-                第 {currentReworkItem.pageIndex + 1} 页 · #{currentReworkItem.order + 1}
-              </span>
-              <span className="rework-line-text">{currentReworkItem.text}</span>
-            </div>
-          </div>
-        )}
 
-        {isReworkMode && reworkQueue.length === 0 && (
-          <div className="rework-finished">
-            <div className="rework-finished-icon">
-              <CheckCircle size={48} />
-            </div>
-            <h3>🎉 返修扫稿完成！</h3>
-            <p className="rework-finished-stats">
-              本次共处理 <strong>{processedCount}</strong> 条，所有需重修的台词都已扫完
-            </p>
-            <button className="rework-exit-btn" onClick={handleStopRework}>
-              返回进度面板
-            </button>
+            {!sessionCompleted && currentSessionItem ? (
+              <>
+                <div className="rework-mode-nav">
+                  <button
+                    className="rework-nav-btn"
+                    onClick={handlePrevRework}
+                    disabled={reworkCursor === 0}
+                    title="上一条"
+                  >
+                    <ChevronLeft size={16} />
+                  </button>
+                  <button
+                    className="rework-nav-btn complete-btn"
+                    onClick={handleReworkComplete}
+                    title="完成本条并下一条"
+                  >
+                    <Check size={16} />
+                    完成
+                  </button>
+                  <button
+                    className="rework-nav-btn skip-btn"
+                    onClick={handleSkipRework}
+                    title="跳过本条"
+                  >
+                    <SkipForward size={16} />
+                  </button>
+                  <button
+                    className="rework-nav-btn"
+                    onClick={handleNextRework}
+                    disabled={reworkCursor >= sessionQueue.length - 1}
+                    title="下一条"
+                  >
+                    <ChevronRight size={16} />
+                  </button>
+                  <button
+                    className="rework-nav-btn stop-btn"
+                    onClick={handleStopRework}
+                    title="退出返修模式"
+                  >
+                    <Square size={14} />
+                  </button>
+                </div>
+                <div className="rework-current-line">
+                  <span className="rework-line-loc">
+                    第 {currentSessionItem.pageIndex + 1} 页 · #{currentSessionItem.order + 1}
+                  </span>
+                  <span className="rework-line-text">{currentSessionItem.text}</span>
+                </div>
+              </>
+            ) : (
+              <div className="rework-finished">
+                <div className="rework-finished-icon">
+                  <CheckCircle size={48} />
+                </div>
+                <h3>🎉 返修扫稿完成！</h3>
+                <p className="rework-finished-stats">
+                  本次共处理 <strong>{sessionCompletedCount}</strong> 条
+                  {sessionSkippedCount > 0 && <>，跳过 <strong>{sessionSkippedCount}</strong> 条</>}
+                  ，目前仍需重修 <strong style={{ color: '#ff9800' }}>{totalReworkQueue.length}</strong> 条
+                </p>
+                <div className="rework-finished-actions">
+                  <button className="rework-exit-btn" onClick={handleStopRework}>
+                    返回进度面板
+                  </button>
+                  {totalReworkQueue.length > 0 && (
+                    <button className="rework-restart-btn" onClick={handleRestartSession}>
+                      <Play size={12} />
+                      再次扫稿
+                    </button>
+                  )}
+                </div>
+              </div>
+            )}
           </div>
         )}
 

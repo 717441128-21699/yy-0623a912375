@@ -425,8 +425,13 @@
   font-size: 16px;
 }
 
-.rework-exit-btn {
+.rework-finished-actions {
+  display: flex;
+  gap: 10px;
   margin-top: 8px;
+}
+
+.rework-exit-btn {
   padding: 8px 20px;
   font-size: 12px;
   font-weight: 600;
@@ -439,4 +444,22 @@
 
 .rework-exit-btn:hover {
   background-color: #1177bb;
+}
+
+.rework-restart-btn {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 18px;
+  font-size: 12px;
+  font-weight: 600;
+  color: #1e1e1e;
+  background-color: #ff9800;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: background-color 0.15s;
+}
+
+.rework-restart-btn:hover {
+  background-color: #ffa726;
 }

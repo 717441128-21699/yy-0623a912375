@@ -66,12 +66,15 @@ export const saveProjectFile = async (projectData: string, defaultName: string):
   }
 }
 
-export const loadProjectFile = async (): Promise<string | null> => {
+export const loadProjectFile = async (filePath?: string): Promise<string | null> => {
   if (isElectron()) {
-    const filePath = await window.electronAPI.openProjectDialog()
-    if (!filePath) return null
-    return await window.electronAPI.loadProject(filePath)
+    const path = filePath || (await window.electronAPI.openProjectDialog())
+    if (!path) return null
+    return await window.electronAPI.loadProject(path)
   } else {
+    if (filePath) {
+      return null
+    }
     return new Promise((resolve) => {
       const input = document.createElement('input')
       input.type = 'file'

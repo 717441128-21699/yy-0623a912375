@@ -33,10 +33,172 @@
   gap: 6px;
   font-size: 12px;
   font-weight: 500;
-  color: #888;
+  color: #cccccc;
   margin-bottom: 12px;
+}
+
+.presets-toolbar {
+  display: flex;
+  gap: 6px;
+  margin-bottom: 8px;
+}
+
+.preset-save-btn {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  padding: 5px 10px;
+  font-size: 11px;
+  color: #1e1e1e;
+  background-color: #8bc34a;
+  border-radius: 4px;
+  font-weight: 500;
+  transition: background-color 0.15s;
+  cursor: pointer;
+}
+
+.preset-save-btn:hover {
+  background-color: #9ccc65;
+}
+
+.preset-save-dialog {
+  display: flex;
+  gap: 4px;
+  margin-bottom: 10px;
+}
+
+.preset-save-dialog input {
+  flex: 1;
+  padding: 4px 8px;
+  font-size: 12px;
+  color: #cccccc;
+  background-color: #1e1e1e;
+  border: 1px solid #3e3e42;
+  border-radius: 3px;
+  outline: none;
+  min-width: 0;
+}
+
+.preset-save-dialog input:focus {
+  border-color: #0e639c;
+}
+
+.preset-save-dialog .dialog-actions {
+  display: flex;
+  gap: 2px;
+}
+
+.preset-save-dialog .dialog-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  border-radius: 3px;
+  cursor: pointer;
+  transition: background-color 0.15s;
+}
+
+.preset-save-dialog .dialog-btn.ok {
+  color: #ffffff;
+  background-color: #2e7d32;
+}
+
+.preset-save-dialog .dialog-btn.ok:hover {
+  background-color: #388e3c;
+}
+
+.preset-save-dialog .dialog-btn.cancel {
+  color: #cccccc;
+  background-color: #3e3e42;
+}
+
+.preset-save-dialog .dialog-btn.cancel:hover {
+  background-color: #4e4e52;
+}
+
+.presets-group {
+  margin-bottom: 8px;
+}
+
+.presets-group-label {
+  font-size: 10px;
+  color: #666;
+  margin-bottom: 5px;
+  font-weight: 500;
   text-transform: uppercase;
   letter-spacing: 0.5px;
+}
+
+.presets-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+}
+
+.preset-chip {
+  display: inline-flex;
+  align-items: center;
+  padding: 4px 10px;
+  font-size: 11px;
+  color: #cccccc;
+  background-color: #1e1e1e;
+  border: 1px solid #3e3e42;
+  border-radius: 12px;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.preset-chip:hover {
+  background-color: #2d2d30;
+  border-color: #0e639c;
+}
+
+.preset-chip.active {
+  background-color: #0e639c;
+  color: #ffffff;
+  border-color: #1177bb;
+}
+
+.preset-chip.custom {
+  padding: 0;
+  overflow: hidden;
+}
+
+.preset-chip.custom .preset-chip-apply {
+  padding: 4px 8px;
+  font-size: 11px;
+  color: inherit;
+  background-color: transparent;
+  cursor: pointer;
+  border: none;
+  outline: none;
+}
+
+.preset-chip.custom .preset-chip-delete {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 22px;
+  background-color: rgba(255, 255, 255, 0.05);
+  border: none;
+  border-left: 1px solid #3e3e42;
+  color: #888;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.preset-chip.custom .preset-chip-delete:hover {
+  background-color: rgba(244, 67, 54, 0.2);
+  color: #f44336;
+}
+
+.presets-hint {
+  font-size: 10px;
+  color: #666;
+  padding: 4px 2px 0;
+  line-height: 1.4;
 }
 
 .style-item {

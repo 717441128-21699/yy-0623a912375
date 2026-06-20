@@ -1,18 +1,82 @@
 .app-header {
   display: flex;
+  flex-direction: column;
+  background-color: #2d2d30;
+  border-bottom: 1px solid #3e3e42;
+  flex-shrink: 0;
+}
+
+.restore-tip-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 6px 16px;
+  background-color: #4a3000;
+  border-bottom: 1px solid #664400;
+  gap: 12px;
+}
+
+.restore-tip-info {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  color: #ff9800;
+}
+
+.restore-tip-info strong {
+  color: #ffffff;
+  font-weight: 600;
+}
+
+.restore-tip-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.restore-btn {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 10px;
+  font-size: 11px;
+  font-weight: 600;
+  color: #1e1e1e;
+  background-color: #ff9800;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: background-color 0.15s;
+  border: none;
+}
+
+.restore-btn:hover {
+  background-color: #ffa726;
+}
+
+.restore-btn.cancel {
+  background-color: transparent;
+  color: #ff9800;
+  border: 1px solid #664400;
+}
+
+.restore-btn.cancel:hover {
+  background-color: rgba(255, 152, 0, 0.1);
+}
+
+.app-header > div:last-child {
+  display: flex;
   align-items: center;
   justify-content: space-between;
   height: 48px;
   padding: 0 16px;
-  background-color: #2d2d30;
-  border-bottom: 1px solid #3e3e42;
-  flex-shrink: 0;
 }
 
 .header-left {
   display: flex;
   align-items: center;
   gap: 12px;
+  position: relative;
 }
 
 .project-name {
@@ -21,6 +85,174 @@
   gap: 8px;
   font-weight: 500;
   color: #cccccc;
+}
+
+.autosave-status {
+  display: flex;
+  align-items: center;
+}
+
+.save-indicator {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 6px;
+  border-radius: 3px;
+  font-size: 10px;
+}
+
+.save-indicator.saving {
+  color: #888;
+}
+
+.save-indicator.saving svg {
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+.save-indicator.saved {
+  color: #4caf50;
+  background-color: rgba(76, 175, 80, 0.1);
+}
+
+.save-indicator.idle {
+  color: #888;
+  font-size: 10px;
+}
+
+.recent-projects-wrapper {
+  position: relative;
+}
+
+.recent-toggle-btn {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 8px;
+  font-size: 11px;
+  color: #888;
+  background-color: #1e1e1e;
+  border: 1px solid #3e3e42;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.recent-toggle-btn:hover {
+  color: #cccccc;
+  border-color: #0e639c;
+}
+
+.recent-toggle-btn .chev {
+  transition: transform 0.15s;
+}
+
+.recent-toggle-btn .chev.open {
+  transform: rotate(180deg);
+}
+
+.recent-dropdown {
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 0;
+  width: 280px;
+  background-color: #252526;
+  border: 1px solid #3e3e42;
+  border-radius: 6px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+  z-index: 100;
+  overflow: hidden;
+}
+
+.recent-dropdown-header {
+  padding: 8px 12px;
+  font-size: 11px;
+  font-weight: 600;
+  color: #888;
+  background-color: #1e1e1e;
+  border-bottom: 1px solid #3e3e42;
+}
+
+.recent-empty {
+  padding: 20px 12px;
+  text-align: center;
+  font-size: 12px;
+  color: #666;
+}
+
+.recent-item {
+  display: flex;
+  align-items: stretch;
+  border-bottom: 1px solid #3e3e42;
+}
+
+.recent-item:last-child {
+  border-bottom: none;
+}
+
+.recent-item-btn {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 12px;
+  cursor: pointer;
+  transition: background-color 0.15s;
+  text-align: left;
+  border: none;
+  background-color: transparent;
+}
+
+.recent-item-btn:hover {
+  background-color: #2d2d30;
+}
+
+.recent-item-main {
+  min-width: 0;
+}
+
+.recent-item-name {
+  display: block;
+  font-size: 12px;
+  font-weight: 500;
+  color: #cccccc;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  margin-bottom: 2px;
+}
+
+.recent-item-meta {
+  font-size: 10px;
+  color: #666;
+}
+
+.recent-item-time {
+  font-size: 10px;
+  color: #888;
+  flex-shrink: 0;
+  margin-left: 8px;
+}
+
+.recent-item-remove {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  background-color: transparent;
+  border: none;
+  border-left: 1px solid #3e3e42;
+  color: #555;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.recent-item-remove:hover {
+  background-color: rgba(244, 67, 54, 0.15);
+  color: #f44336;
 }
 
 .header-center {

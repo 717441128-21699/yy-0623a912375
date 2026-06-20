@@ -1,6 +1,16 @@
+import { useState } from 'react'
 import { useProjectStore } from '../store/useProjectStore'
 import { TextBoxStyle } from '../types'
-import { Settings, Type, AlignLeft, Palette } from 'lucide-react'
+import {
+  Settings,
+  Type,
+  AlignLeft,
+  Palette,
+  BookMarked,
+  Save,
+  Check,
+  X,
+} from 'lucide-react'
 import './StylePanel.css'
 
 const fontFamilies = [
@@ -28,7 +38,15 @@ export default function StylePanel() {
     updateDialogueLine,
     currentPageIndex,
     setDialogueStatus,
+    stylePresets,
+    addStylePreset,
+    removeStylePreset,
+    applyPresetToTextBox,
+    applyPresetAsDefault,
   } = useProjectStore()
+
+  const [showSaveDialog, setShowSaveDialog] = useState(false)
+  const [newPresetName, setNewPresetName] = useState('')
 
   const selectedTextBox = textBoxes.find((t) => t.id === selectedTextBoxId)
   const selectedLine = dialogueLines.find((l) => l.id === selectedLineId)
@@ -48,7 +66,7 @@ export default function StylePanel() {
 
   const handleCreateTextBox = () => {
     if (!selectedLine) return
-    
+
     const textBoxId = addTextBox({
       pageIndex: currentPageIndex,
       x: 100,
@@ -58,11 +76,35 @@ export default function StylePanel() {
       text: selectedLine.text,
       style: { ...defaultStyle },
     })
-    
+
     updateDialogueLine(selectedLine.id, { textBoxId })
     setDialogueStatus(selectedLine.id, 'embedded')
     useProjectStore.getState().selectTextBox(textBoxId)
   }
+
+  const handleApplyPreset = (presetId: string) => {
+    if (isEditingTextBox && selectedTextBoxId) {
+      applyPresetToTextBox(selectedTextBoxId, presetId)
+    } else {
+      applyPresetAsDefault(presetId)
+    }
+  }
+
+  const handleSaveAsPreset = () => {
+    const name = newPresetName.trim()
+    if (!name) return
+    addStylePreset(name, currentStyle)
+    setNewPresetName('')
+    setShowSaveDialog(false)
+  }
+
+  const builtInList = stylePresets.filter((p) => p.isBuiltIn)
+  const customList = stylePresets.filter((p) => !p.isBuiltIn)
+
+  const presetStyleKey = (s: TextBoxStyle) =>
+    `${s.fontFamily}|${s.fontSize}|${s.lineHeight}|${s.fillColor}|${s.strokeColor}|${s.strokeWidth}|${s.bold}|${s.italic}|${s.isVertical}`
+
+  const currentKey = presetStyleKey(currentStyle)
 
   return (
     <div className="style-panel">
@@ -75,10 +117,100 @@ export default function StylePanel() {
 
       <div className="style-section">
         <div className="section-title">
+          <BookMarked size={14} />
+          样式预设
+        </div>
+
+        <div className="presets-toolbar">
+          <button
+            className="preset-save-btn"
+            onClick={() => setShowSaveDialog(true)}
+            title="保存当前样式为自定义预设"
+          >
+            <Save size={12} />
+            保存预设
+          </button>
+        </div>
+
+        {showSaveDialog && (
+          <div className="preset-save-dialog">
+            <input
+              type="text"
+              value={newPresetName}
+              onChange={(e) => setNewPresetName(e.target.value)}
+              onKeyDown={(e) => e.key === 'Enter' && handleSaveAsPreset()}
+              placeholder="预设名称..."
+              autoFocus
+            />
+            <div className="dialog-actions">
+              <button className="dialog-btn ok" onClick={handleSaveAsPreset}>
+                <Check size={12} />
+              </button>
+              <button className="dialog-btn cancel" onClick={() => setShowSaveDialog(false)}>
+                <X size={12} />
+              </button>
+            </div>
+          </div>
+        )}
+
+        <div className="presets-group">
+          <div className="presets-group-label">内置</div>
+          <div className="presets-list">
+            {builtInList.map((preset) => (
+              <button
+                key={preset.id}
+                className={`preset-chip ${presetStyleKey(preset.style) === currentKey ? 'active' : ''}`}
+                onClick={() => handleApplyPreset(preset.id)}
+                title={`应用预设：${preset.name}`}
+              >
+                {preset.name}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {customList.length > 0 && (
+          <div className="presets-group">
+            <div className="presets-group-label">自定义</div>
+            <div className="presets-list">
+              {customList.map((preset) => (
+                <div
+                  key={preset.id}
+                  className={`preset-chip custom ${presetStyleKey(preset.style) === currentKey ? 'active' : ''}`}
+                  title={preset.name}
+                >
+                  <button
+                    className="preset-chip-apply"
+                    onClick={() => handleApplyPreset(preset.id)}
+                  >
+                    {preset.name}
+                  </button>
+                  <button
+                    className="preset-chip-delete"
+                    onClick={() => removeStylePreset(preset.id)}
+                    title="删除预设"
+                  >
+                    <X size={10} />
+                  </button>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        <div className="presets-hint">
+          {isEditingTextBox
+            ? '应用到当前文字框；未选中框时设为默认样式'
+            : '所有新建文字框将使用默认样式'}
+        </div>
+      </div>
+
+      <div className="style-section">
+        <div className="section-title">
           <Type size={14} />
           字体
         </div>
-        
+
         <div className="style-item">
           <label>字体</label>
           <select
@@ -214,7 +346,7 @@ export default function StylePanel() {
             <AlignLeft size={14} />
             位置大小
           </div>
-          
+
           <div className="style-item">
             <label>X 坐标</label>
             <div className="input-with-unit">

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { useProjectStore } from '../store/useProjectStore'
 import { ProjectState } from '../types'
 import { renderPageToDataUrl } from '../utils/exportUtils'
@@ -14,7 +14,14 @@ import {
   Layers,
   AlertTriangle,
   BarChart3,
+  History,
+  Clock,
+  X,
+  ChevronDown,
+  RefreshCw,
+  Check,
 } from 'lucide-react'
+import { RecentProject, getRecentProjects, addRecentProject, removeRecentProject, saveBackup, getLastBackup, getLastBackupTime, clearBackup } from '../utils/projectUtils'
 import './Header.css'
 
 interface HeaderProps {
@@ -32,9 +39,162 @@ export default function Header({ onOpenProgress, onOpenReview }: HeaderProps) {
     projectPath,
     dialogueLines,
     textBoxes,
+    setProjectPath,
+    loadProject,
+    defaultStyle,
+    stylePresets,
   } = useProjectStore()
 
   const [isExporting, setIsExporting] = useState(false)
+  const [showRecent, setShowRecent] = useState(false)
+  const [recentList, setRecentList] = useState<RecentProject[]>([])
+  const [lastSavedAt, setLastSavedAt] = useState<number>(0)
+  const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'saved'>('idle')
+  const [showRestoreTip, setShowRestoreTip] = useState(false)
+  const [backupInfo, setBackupInfo] = useState<{
+    state: ProjectState
+    time: number
+    pageCount: number
+    lineCount: number
+  } | null>(null)
+
+  const timerRef = useRef<number | null>(null)
+  const recentBtnRef = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    setRecentList(getRecentProjects())
+  }, [])
+
+  useEffect(() => {
+    if (!showRecent) return
+    const handler = (e: MouseEvent) => {
+      if (recentBtnRef.current && !recentBtnRef.current.contains(e.target as Node)) {
+        setShowRecent(false)
+      }
+    }
+    document.addEventListener('mousedown', handler)
+    return () => document.removeEventListener('mousedown', handler)
+  }, [showRecent])
+
+  useEffect(() => {
+    if (pages.length > 0 || dialogueLines.length > 0) {
+      addRecentProject({
+        name: projectName,
+        path: projectPath,
+        pageCount: pages.length,
+        lineCount: dialogueLines.length,
+        thumb: pages[0]?.imageDataUrl?.slice(0, 200) + '...',
+      })
+    }
+  }, [projectName, projectPath, pages.length, dialogueLines.length])
+
+  useEffect(() => {
+    if (pages.length === 0 && dialogueLines.length === 0 && textBoxes.length === 0) {
+      const backup = getLastBackup()
+      const backupTime = getLastBackupTime()
+      const STALE_MS = 7 * 24 * 60 * 60 * 1000
+      if (backup && backupTime && Date.now() - backupTime < STALE_MS) {
+        const hasContent = backup.pages.length > 0 || backup.dialogueLines.length > 0
+        if (hasContent) {
+          setBackupInfo({
+            state: backup,
+            time: backupTime,
+            pageCount: backup.pages.length,
+            lineCount: backup.dialogueLines.length,
+          })
+          setShowRestoreTip(true)
+        }
+      }
+    }
+  }, [])
+
+  useEffect(() => {
+    const hasContent = pages.length > 0 || dialogueLines.length > 0 || textBoxes.length > 0
+    if (!hasContent) return
+
+    const triggerSave = () => {
+      setSaveStatus('saving')
+      const state = useProjectStore.getState()
+      const projectData: ProjectState = {
+        pages: state.pages,
+        currentPageIndex: state.currentPageIndex,
+        dialogueLines: state.dialogueLines,
+        textBoxes: state.textBoxes,
+        selectedLineId: null,
+        selectedTextBoxId: null,
+        projectPath: state.projectPath,
+        projectName: state.projectName,
+        defaultStyle: state.defaultStyle,
+        stylePresets: state.stylePresets,
+      }
+      saveBackup(projectData)
+      setLastSavedAt(Date.now())
+      setTimeout(() => setSaveStatus('saved'), 150)
+      setTimeout(() => setSaveStatus('idle'), 2000)
+    }
+
+    const scheduleSave = () => {
+      if (timerRef.current) {
+        clearTimeout(timerRef.current)
+      }
+      timerRef.current = window.setTimeout(triggerSave, 5000)
+    }
+
+    scheduleSave()
+
+    return () => {
+      if (timerRef.current) {
+        clearTimeout(timerRef.current)
+      }
+    }
+  }, [pages, dialogueLines, textBoxes, defaultStyle, stylePresets])
+
+  const formatTime = (ts: number) => {
+    if (!ts) return ''
+    const d = new Date(ts)
+    return d.toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit', second: '2-digit' })
+  }
+
+  const formatRelative = (ts: number) => {
+    const diff = Date.now() - ts
+    const mins = Math.floor(diff / 60000)
+    if (mins < 1) return '刚刚'
+    if (mins < 60) return `${mins} 分钟前`
+    const hours = Math.floor(mins / 60)
+    if (hours < 24) return `${hours} 小时前`
+    return `${Math.floor(hours / 24)} 天前`
+  }
+
+  const handleRestoreBackup = () => {
+    if (!backupInfo) return
+    loadProject(backupInfo.state)
+    setShowRestoreTip(false)
+    setBackupInfo(null)
+    clearBackup()
+  }
+
+  const handleDiscardBackup = () => {
+    setShowRestoreTip(false)
+    setBackupInfo(null)
+    clearBackup()
+  }
+
+  const handleOpenRecent = (recent: RecentProject) => {
+    setShowRecent(false)
+    if (recent.path) {
+      loadProjectFile(recent.path).then((data) => {
+        if (data) {
+          try {
+            const projectData = JSON.parse(data) as ProjectState
+            loadProject(projectData)
+            setProjectPath(recent.path)
+          } catch {
+            alert('项目文件已丢失或格式错误')
+          }
+        }
+      })
+    }
+  }
 
   const handleImportImages = useCallback(async () => {
     const images = await openImageFiles()
@@ -55,25 +215,43 @@ export default function Header({ onOpenProgress, onOpenReview }: HeaderProps) {
       projectPath: state.projectPath,
       projectName: state.projectName,
       defaultStyle: state.defaultStyle,
+      stylePresets: state.stylePresets,
     }
     const json = JSON.stringify(projectData, null, 2)
-    
+
     if (projectPath) {
       // In browser mode, we always download a new file
     }
-    
+
     const success = await saveProjectFile(json, `${projectName}.json`)
     if (success) {
-      // In browser mode, we can't track the saved path
+      addRecentProject({
+        name: projectName,
+        path: projectPath,
+        pageCount: pages.length,
+        lineCount: dialogueLines.length,
+      })
+      setRecentList(getRecentProjects())
+      setLastSavedAt(Date.now())
+      setSaveStatus('saved')
+      setTimeout(() => setSaveStatus('idle'), 2000)
     }
-  }, [projectPath, projectName])
+  }, [projectPath, projectName, pages.length, dialogueLines.length])
 
   const handleLoadProject = useCallback(async () => {
     const data = await loadProjectFile()
     if (data) {
       try {
         const projectData = JSON.parse(data) as ProjectState
-        useProjectStore.getState().loadProject(projectData)
+        const state = useProjectStore.getState()
+        state.loadProject(projectData)
+        addRecentProject({
+          name: projectData.projectName,
+          path: projectData.projectPath,
+          pageCount: projectData.pages.length,
+          lineCount: projectData.dialogueLines.length,
+        })
+        setRecentList(getRecentProjects())
       } catch (e) {
         alert('项目文件格式错误')
       }
@@ -208,10 +386,112 @@ export default function Header({ onOpenProgress, onOpenReview }: HeaderProps) {
 
   return (
     <header className="app-header">
+      {showRestoreTip && backupInfo && (
+        <div className="restore-tip-bar">
+          <div className="restore-tip-info">
+            <RefreshCw size={14} />
+            <span>
+              检测到未保存的备份（{formatRelative(backupInfo.time)}）：
+              <strong>{backupInfo.pageCount}</strong> 页，
+              <strong>{backupInfo.lineCount}</strong> 条台词
+            </span>
+          </div>
+          <div className="restore-tip-actions">
+            <button className="restore-btn" onClick={handleRestoreBackup}>
+              恢复上次状态
+            </button>
+            <button className="restore-btn cancel" onClick={handleDiscardBackup}>
+              <X size={12} />
+              丢弃
+            </button>
+          </div>
+        </div>
+      )}
+
       <div className="header-left">
         <div className="project-name">
           <FileText size={16} />
           <span>{projectName}</span>
+        </div>
+        <div className="autosave-status" title={lastSavedAt ? `上次保存 ${formatTime(lastSavedAt)}` : '尚未保存'}>
+          {saveStatus === 'saving' && (
+            <>
+              <span className="save-indicator saving">
+                <RefreshCw size={10} />
+                自动保存中...
+              </span>
+            </>
+          )}
+          {saveStatus === 'saved' && (
+            <>
+              <span className="save-indicator saved">
+                <Check size={10} />
+                已保存 {formatTime(lastSavedAt)}
+              </span>
+            </>
+          )}
+          {saveStatus === 'idle' && lastSavedAt > 0 && (
+            <>
+              <span className="save-indicator idle">
+                <Clock size={10} />
+                自动保存 {formatRelative(lastSavedAt)}
+              </span>
+            </>
+          )}
+        </div>
+        <div className="recent-projects-wrapper" ref={recentBtnRef}>
+          <button
+            className="recent-toggle-btn"
+            onClick={() => {
+              setRecentList(getRecentProjects())
+              setShowRecent(!showRecent)
+            }}
+            title="最近打开的项目"
+          >
+            <History size={14} />
+            最近项目
+            <ChevronDown size={12} className={`chev ${showRecent ? 'open' : ''}`} />
+          </button>
+          {showRecent && (
+            <div className="recent-dropdown">
+              <div className="recent-dropdown-header">最近打开的项目</div>
+              {recentList.length === 0 ? (
+                <div className="recent-empty">暂无最近项目</div>
+              ) : (
+                recentList.map((recent, idx) => (
+                  <div
+                    key={`${recent.path || recent.name}-${idx}`}
+                    className="recent-item"
+                  >
+                    <button
+                      className="recent-item-btn"
+                      onClick={() => handleOpenRecent(recent)}
+                      title={recent.path || recent.name}
+                    >
+                      <div className="recent-item-main">
+                        <span className="recent-item-name">{recent.name}</span>
+                        <div className="recent-item-meta">
+                          {recent.pageCount} 页 · {recent.lineCount} 条
+                        </div>
+                      </div>
+                      <span className="recent-item-time">{formatRelative(recent.lastOpen)}</span>
+                    </button>
+                    <button
+                      className="recent-item-remove"
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        removeRecentProject(recent.path || recent.name)
+                        setRecentList(getRecentProjects())
+                      }}
+                      title="从列表移除"
+                    >
+                      <X size={12} />
+                    </button>
+                  </div>
+                ))
+              )}
+            </div>
+          )}
         </div>
       </div>
 
