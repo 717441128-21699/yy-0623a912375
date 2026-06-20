@@ -1,0 +1,138 @@
+.app-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  height: 48px;
+  padding: 0 16px;
+  background-color: #2d2d30;
+  border-bottom: 1px solid #3e3e42;
+  flex-shrink: 0;
+}
+
+.header-left {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.project-name {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-weight: 500;
+  color: #cccccc;
+}
+
+.header-center {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.nav-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 4px;
+  color: #cccccc;
+  transition: background-color 0.15s;
+}
+
+.nav-btn:hover:not(:disabled) {
+  background-color: #3e3e42;
+}
+
+.nav-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.page-info {
+  min-width: 60px;
+  text-align: center;
+  color: #aaaaaa;
+  font-size: 13px;
+}
+
+.header-right {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.action-btn {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  border-radius: 4px;
+  background-color: #3e3e42;
+  color: #cccccc;
+  font-size: 12px;
+  transition: background-color 0.15s;
+}
+
+.action-btn:hover:not(:disabled) {
+  background-color: #4a4a4e;
+}
+
+.action-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.action-btn.primary {
+  background-color: #0e639c;
+  color: #ffffff;
+}
+
+.action-btn.primary:hover:not(:disabled) {
+  background-color: #1177bb;
+}
+
+.export-dropdown {
+  position: relative;
+}
+
+.export-menu {
+  position: absolute;
+  top: 100%;
+  right: 0;
+  margin-top: 4px;
+  background-color: #2d2d30;
+  border: 1px solid #3e3e42;
+  border-radius: 6px;
+  padding: 4px;
+  min-width: 140px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+  display: none;
+  z-index: 1000;
+}
+
+.export-dropdown:hover .export-menu {
+  display: block;
+}
+
+.export-menu button {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 8px 12px;
+  border-radius: 4px;
+  color: #cccccc;
+  font-size: 12px;
+  text-align: left;
+  transition: background-color 0.15s;
+}
+
+.export-menu button:hover:not(:disabled) {
+  background-color: #3e3e42;
+}
+
+.export-menu button:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}

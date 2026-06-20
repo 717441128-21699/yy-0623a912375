@@ -1,0 +1,159 @@
+.style-panel {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  background-color: #252526;
+  border-left: 1px solid #3e3e42;
+  overflow-y: auto;
+}
+
+.panel-header {
+  padding: 12px 16px;
+  border-bottom: 1px solid #3e3e42;
+  flex-shrink: 0;
+}
+
+.panel-header h3 {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 14px;
+  font-weight: 600;
+  color: #cccccc;
+}
+
+.style-section {
+  padding: 12px 16px;
+  border-bottom: 1px solid #3e3e42;
+}
+
+.section-title {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  font-weight: 500;
+  color: #888;
+  margin-bottom: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.style-item {
+  margin-bottom: 10px;
+}
+
+.style-item:last-child {
+  margin-bottom: 0;
+}
+
+.style-item label {
+  display: block;
+  font-size: 12px;
+  color: #aaaaaa;
+  margin-bottom: 4px;
+}
+
+.style-item input[type="text"],
+.style-item input[type="number"],
+.style-item select {
+  width: 100%;
+  padding: 6px 8px;
+  background-color: #1e1e1e;
+  border: 1px solid #3e3e42;
+  border-radius: 4px;
+  color: #e0e0e0;
+  font-size: 13px;
+}
+
+.style-item input[type="text"]:focus,
+.style-item input[type="number"]:focus,
+.style-item select:focus {
+  border-color: #0e639c;
+}
+
+.input-with-unit {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.input-with-unit input {
+  flex: 1;
+}
+
+.input-with-unit .unit {
+  font-size: 11px;
+  color: #888;
+  min-width: 24px;
+}
+
+.checkbox-item {
+  display: flex;
+  gap: 16px;
+}
+
+.checkbox-item label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: #aaaaaa;
+  margin-bottom: 0;
+  cursor: pointer;
+}
+
+.checkbox-item input[type="checkbox"] {
+  width: auto;
+  cursor: pointer;
+}
+
+.color-input {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.color-input input[type="color"] {
+  width: 32px;
+  height: 28px;
+  padding: 0;
+  border: 1px solid #3e3e42;
+  border-radius: 4px;
+  background: none;
+  cursor: pointer;
+}
+
+.color-input input[type="color"]::-webkit-color-swatch-wrapper {
+  padding: 2px;
+}
+
+.color-input input[type="color"]::-webkit-color-swatch {
+  border: none;
+  border-radius: 2px;
+}
+
+.color-input .color-text {
+  flex: 1;
+  font-family: monospace;
+  font-size: 12px;
+}
+
+.action-section {
+  padding: 16px;
+}
+
+.create-btn {
+  width: 100%;
+  padding: 10px;
+  background-color: #0e639c;
+  color: #ffffff;
+  border-radius: 6px;
+  font-size: 13px;
+  font-weight: 500;
+  transition: background-color 0.15s;
+}
+
+.create-btn:hover {
+  background-color: #1177bb;
+}
